@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Multiplayer game client</title>
+	<style>
+        body, html { 
+			width: 100%;
+  			height: 100%;
+  			margin: 0px;
+  			border: 0;
+			padding: 0;
+  			overflow: hidden;
+  			/*  Disable scrollbars */
+  			display: block;
+  			/* No floating content on sides */
+        }
+		canvas {
+    		outline: none; /* Remove outline on focus */
+			transform-origin: left top;
+			image-rendering: pixelated;
+  		}
+		#death-layer {
+			background-color:transparent;
+			z-index: 1;
+			position: absolute;
+			width: 100%; /* Adjust the width as needed */
+			height: 100%;
+			pointer-events: none;
+		}
+		#connection-layer {
+			background-color:darkblue;
+			z-index: 1;
+			position: absolute;
+			width: 100%; /* Adjust the width as needed */
+			height: 100%;
+			pointer-events: none;
+			transition: background-color 0.5s ease
+		}
+		.ui-bar {
+			user-select: none;
+			z-index: 1; 
+			background-color: #33333377; /* Adjust the background color as needed */
+			position: absolute;
+			width: 300px; /* Adjust the width as needed */
+			height: 15px;
+			border-radius: 50px; /* Oval shape for the top */
+			left: 50%;
+			transform: translateX(-50%);
+			pointer-events: none;
+		}
+		#score-bar {
+			bottom: 35px;
+		}
+		#level-bar {
+			bottom: 10px;
+		}
+		.ui-fill {
+ 			width: 0%; /* Initial width is 0% */
+  			height: 100%;
+			border-radius: 50px;
+  			position: relative;
+  			transition: width 0.5s ease; /* Add smooth transition effect */
+		}
+		#score-fill {
+			background-color: #df700e77;/* Progress color */
+		}
+		#level-fill {
+			background-color: #a41d0577;/* Progress color */
+		}
+		.ui-element {
+			font-size: 15px;
+  			color: #ffffff;
+			left: 50%;
+			bottom: -2.5px;
+			transform: translateX(-50%);
+			position: absolute;
+			font-family: cursive;
+		}
+		#death-element {
+			opacity: 0%;
+			bottom: 50%;
+			transition: opacity 2s ease;
+		}
+		#connection-element-1 {
+			bottom: 50%;
+			opacity: 1;
+			transition: opacity 0.5s ease
+		}
+		#connection-element-2 {
+			bottom: 45%;
+			opacity: 0;
+			font-size: 30px;
+			color: red;
+		}
+    </style>
+</head>
+<body>
+	<div id="connection-layer" class="ui-layer">
+		<div id="connection-element-1" class="ui-element">
+			<span id="connection-text">(Waiting for WebSocket Connection)</span>
+		</div>
+		<div id="connection-element-2" class="ui-element">
+			<span id="connection-text">Connection Failed</span>
+		</div>
+	</div>
+	<div id="death-layer" class="ui-layer">
+		<div id="death-element" class="ui-element">
+			<span id="respawn-text">(Press 'Enter' To Respawn)</span>
+		</div>
+	</div>
+	<div id="score-bar" class="ui-bar">
+		<div id="score-fill" class="ui-fill"></div>
+		<div id="score-element" class="ui-element">
+			Score: <span id="score-value">0</span>
+		</div>
+	</div>
+	<div id="level-bar" class="ui-bar">
+		<div id="level-fill" class="ui-fill"></div>
+		<div id="level-element" class="ui-element">
+			Level: <span id="level-value">1</span>
+		</div>
+	</div>
+	<canvas id="gameArea" tabindex="1"></canvas>
+	<script type="text/javascript">
+
+		
+		
+		
+
+
+
+
+		const worker = new Worker("worker.js");
+		const canvas = document.getElementById('gameArea');
+		const scaleFactor = 1 / window.devicePixelRatio;
+		canvas.style.transform = `scale(${scaleFactor})`;
+		const offscreen = canvas.transferControlToOffscreen();
+		worker.postMessage({ type:'canvas', data:offscreen }, [offscreen]);
+		let disconnected = false;
+		updateCanvasSize();
+	
+
+
+        // Set canvas size on page load
+        //updateCanvasSize();
+
+		canvas.focus();     //poli kako gia to live preview 
+
+		let zoomLevel = 1;
+		var yaxis;
+		var xaxis;
+		var mouseDownInterval;
+		var angle;
+		//var thisclientId;
+		let arrowUpPressed = false;
+		let arrowDownPressed = false;
+		let arrowRightPressed = false;
+		let arrowLeftPressed = false;
+		let isShooting = false;
+		let deathFlag = false;
+		const throttleInterval = 40; // Set the throttle interval in milliseconds
+		let lastMouseMoveTime = 0;
+		let score;
+		let highScore;
+		//var intervalID;
+		var drawables = [];
+
+		function Drawable(clientId, name, width, height, topLeftX, topLeftY, color, maxHealth, currentHealth, shape, type, shootingAngle){
+		this.clientId = clientId;
+		this.name = name;
+		this.width = width;
+		this.height = height;
+		this.topLeftX = topLeftX;
+		this.topLeftY = topLeftY;
+		this.color = color; 
+		this.maxHealth = maxHealth; // Health Logic
+		this.currentHealth = currentHealth; // Health Logic
+		this.shape = shape;
+		this.type = type;
+		this.shootingAngle = shootingAngle;
+		};
+
+		var url = window.location.href;
+
+		var parsedUrl = new URL(url);
+
+		// Get the query parameters using URLSearchParams
+		var queryParams = new URLSearchParams(parsedUrl.search);
+
+		// Shared variables
+		var buttonPressed;
+		var serverSelect;
+		var playerName;
+
+		// Get the value of the 'serverSelect' parameter
+		if (buttonPressed == undefined){
+			serverSelect = queryParams.get('serverSelect');
+			playerName = queryParams.get('playerName');
+		}
+		
+
+		
+		if (url.startsWith('http://')) {
+  		  // Remove 'http://' from the beginning
+  		  url = url.slice(7);
+		} else if (url.startsWith('https://')) {
+		  // Remove 'https://' from the beginning
+		  url = url.slice(8);
+		}
+
+		// Split the URL by '/' to get the domain
+		var parts = url.split(':');
+		var domain = parts[0]; // The first part is the domain
+		var websocket;
+		var port;
+		
+
+		
+
+
+		// ----------------------------------------- Start of Presentation Logic -----------------------------------------
+
+
+			if (port != undefined){
+				websocket = new WebSocket(`ws://${domain}:${port}/connected?${playerName}`);
+			}
+			
+			if (websocket != undefined){
+				websocket.addEventListener('message',function(event){
+					if (document.getElementById('connection-layer').style.backgroundColor != 'transparent'){
+						document.getElementById('connection-layer').style.backgroundColor = 'transparent';
+						document.getElementById('connection-element-1').style.opacity = '0';
+					}
+					//const receivedArrayBuffer = Buffer.from(event.data).buffer;
+					//const receivedUint8Array = new Uint8Array(receivedArrayBuffer);
+					const blob = event.data;
+					const fileReader = new FileReader();
+					fileReader.readAsArrayBuffer(blob);
+					fileReader.onload = function () {
+  						// Get the ArrayBuffer from the FileReader result
+  						const arrayBuffer = fileReader.result;
+
+  						// Create a Uint8Array from the ArrayBuffer
+  						const receivedUint8Array = new Uint8Array(arrayBuffer);
+
+						const flagSize = "1".length; // Adjust the flag size as needed
+  						const flagBuffer = receivedUint8Array.slice(-flagSize);
+  						const flag = new TextDecoder().decode(flagBuffer);
+						var dataWithoutFlag = receivedUint8Array.slice(0, -flagSize);
+					
+  						if (flag === "1") {
+							if (!document.hidden){
+  								// Now you can use pako to decompress the data
+								dataWithoutFlag = pako.inflate(dataWithoutFlag);
+								const decoder = new TextDecoder();
+  								const decodedString = decoder.decode(dataWithoutFlag);
+  								const message = JSON.parse(decodedString);
+								passToWorkerOrNot(message);
+							}
+						} else {
+  							// Convert decompressed data to string or process it as needed
+  							const decoder = new TextDecoder();
+  							const decodedString = decoder.decode(dataWithoutFlag);
+  							const message = JSON.parse(decodedString);
+							passToWorkerOrNot(message);
+						}
+
+					
+					};
+				});
+				websocket.addEventListener('error', handleWebSocketErrorOrClose);
+				websocket.addEventListener('close', handleWebSocketErrorOrClose);
+			} else {
+				handleWebSocketErrorOrClose();
+			}
+			
+		
+		// ----------------------------------------- End of Presentation Logic -----------------------------------------
+
+	
+
+		
+		// ----------------------------------------- Start of Other Functions -----------------------------------------
+
+
+		function passToWorkerOrNot(message){
+			switch(message.type){
+				case 'model':
+						// ----------------------------------------- Model -----------------------------------------
+						drawables.length = 0;
+						arrayOfArrays = message.data;
+						for (var i = 0; i < arrayOfArrays.length; i++) {
+						var attributesArray = arrayOfArrays[i];
+						var drawable = new Drawable(
+						    attributesArray[0], // clientId
+						    attributesArray[1], // name
+						    attributesArray[2], // width
+						    attributesArray[3], // height
+						    attributesArray[4], // topLeftX
+						    attributesArray[5], // topLeftY
+						    attributesArray[6], // color
+						    attributesArray[7], // maxHealth
+							attributesArray[8], // currentHealth
+							attributesArray[9], // shape
+							attributesArray[10], // type
+							attributesArray[11] // shootingAngle
+						);
+						drawables.push(drawable);
+						}
+						
+
+						worker.postMessage({ type:'model', data:JSON.stringify(drawables) });
+					break;
+				case 'connected':
+						properId = message.data.clientId;
+						gameBoundsWidth = message.data.bounds.width;
+						gameBoundsHeight = message.data.bounds.height;
+						collumns = message.data.grid.cols;
+						rows = message.data.grid.rows;
+						const connectedData = {properId,gameBoundsWidth,gameBoundsHeight,collumns,rows}
+						worker.postMessage({ type:'connected', data:JSON.stringify(connectedData) });
+					break;
+				case 'experience':
+						level = message.data.level;
+						experience = message.data.experience;
+						score = message.data.score;
+						// we dont pass to worker because we use css instead of canvas
+						maxExperience = getBaseDivisorAtLevel(level);
+						//console.log(maxExperience);
+						experiencePercentage = experience / maxExperience;
+						document.getElementById('level-value').textContent = level;
+						document.getElementById('score-value').textContent = score;
+						document.getElementById('level-fill').style.width = `${experiencePercentage*100}%`;
+
+
+						scorePercentage = score / maxScore;
+						if (scorePercentage > 1.0) {
+    						scorePercentage = 1.0; // Set scorePercentage to 100% if it exceeds 100%
+						}
+						document.getElementById('score-fill').style.width = `${scorePercentage*100}%`;
+
+					break;
+				case 'highScore':
+						maxScore = message.data.highScore;
+						scorePercentage = score / maxScore;
+						if (scorePercentage > 1.0) {
+    						scorePercentage = 1.0; // Set scorePercentage to 100% if it exceeds 100%
+						}
+						document.getElementById('score-fill').style.width = `${scorePercentage*100}%`;
+					break;
+				case 'death':
+						deathFlag = message.data;
+						document.getElementById('death-layer').style.backgroundColor = '#4a080827';
+						document.getElementById('death-element').style.transition = 'opacity 2s ease';
+						document.getElementById('death-element').style.opacity = '100%';						
+					break;
+				default:
+					break;
+			}
+		}
+
+
+		function handleWebSocketErrorOrClose(event) {
+			if (event != undefined){
+				if (event.type === 'error') {
+					console.error('WebSocket Error:', event);
+				} else if (event.type === 'close') {
+					console.error('WebSocket Connection Is Closed');
+				}
+			} else {
+				console.error('Try Going Through ServerHub This Time')
+			}
+			disconnected = true;
+			document.getElementById('connection-element-2').style.opacity = '1';
+		}
+
+
+		function getBaseDivisorAtLevel(level) {
+  			let baseDivisor = 1000; // Initial base divisor
+  			for (let i = 1; i < level; i++) {
+    			baseDivisor = Math.round(baseDivisor * 1.1); // Increase the divisor (adjust this factor)
+  			}
+  			return baseDivisor;
+		}
+
+
+
+		function updateCanvasSize() {
+			if (disconnected == false){
+
+            canvasWidth = window.innerWidth / scaleFactor;
+            canvasHeight = window.innerHeight / scaleFactor;
+
+			const sizeData = {canvasWidth,canvasHeight}
+			worker.postMessage({ type:'resize', data:JSON.stringify(sizeData) });
+			}
+        }
+
+
+
+
+		// zoom in out
+		function handleMouseWheel(event) {
+      		const delta = Math.sign(event.deltaY);
+			var zoomStep = 0.05;
+      		if (delta === -1) {
+				zoomLevel += zoomStep;
+				if (zoomLevel >= 1.55) {
+          			zoomLevel = 1.5;
+					return;
+        		}
+      		} else if (delta === 1) {
+        		zoomLevel -= zoomStep;
+				if (zoomLevel <= 0.7) {
+          			zoomLevel = 0.75;
+					return;
+				}
+      		}
+			const zoomLevelData = {zoomLevel,zoomStep,delta}
+			worker.postMessage({ type:'zoomlevel', data:JSON.stringify(zoomLevelData) });
+    	}
+
+	
+		
+		// swap tabs while key is pressed
+		function handleVisibilityChange() {
+			if ((websocket != undefined) && (websocket.readyState == 1)){
+      			if ((arrowUpPressed || arrowDownPressed || arrowRightPressed || arrowLeftPressed) || isShooting) {
+				
+					//clearInterval(intervalID);
+					arrowUpPressed = false;
+					arrowDownPressed = false;
+					arrowRightPressed = false;
+					arrowLeftPressed = false;
+					const message = {type:'userAction',data:'ArrowNotClicked'};
+					websocket.send(JSON.stringify(message));
+					isShooting = false;
+					const message2 = {type:'userProjectile',shoot:'false',data:angle};
+					websocket.send(JSON.stringify(message2));
+				}
+      		}
+    	}
+
+
+
+		function handleKeyAction() {  // koino kai gia to keydown kai gia to keyup event listener
+			// oti einai prasino den xreiazetai pleon alla xreiazotan otan den eixame to recenter function
+
+
+			//clearInterval(intervalID);
+
+			// 3o epipedo - 3 koumpia
+			if (arrowUpPressed && arrowRightPressed && arrowLeftPressed) {  
+			//intervalID = setInterval(function () {cameraY += 4.3 * zoomLevel;}, 40);
+    		const message = {type: 'userAction', data: 'ArrowUp'};
+    		websocket.send(JSON.stringify(message));
+  			} else if (arrowDownPressed && arrowRightPressed && arrowLeftPressed)  {
+			//intervalID = setInterval(function () {cameraY -= 4.3 * zoomLevel;}, 40);
+    		const message = {type: 'userAction', data: 'ArrowDown'};
+    		websocket.send(JSON.stringify(message));
+  			} else if (arrowRightPressed && arrowUpPressed && arrowDownPressed) {
+			//intervalID = setInterval(function () {cameraX -= 4.3 * zoomLevel;}, 40);
+    		const message = {type: 'userAction', data: 'ArrowRight'};
+    		websocket.send(JSON.stringify(message));
+  			} else if (arrowLeftPressed && arrowUpPressed && arrowDownPressed) {
+			//intervalID = setInterval(function () {cameraX += 4.3 * zoomLevel;}, 40);
+    		const message = {type: 'userAction', data: 'ArrowLeft'};
+    		websocket.send(JSON.stringify(message));
+			} else
+
+
+
+			// 2o epipedo - 2 koumpia
+			if ((arrowUpPressed && arrowDownPressed) || (arrowRightPressed && arrowLeftPressed)) {
+				const message = {type:'userAction',data:'ArrowNotClicked'};
+				websocket.send(JSON.stringify(message));
+			} else  if (arrowUpPressed && arrowRightPressed){
+				//intervalID = setInterval(function () {cameraY += 4.3 * zoomLevel,cameraX -= 4.3 * zoomLevel;}, 40);
+				const message = {type:'userAction',data:'ArrowUp+Right'};
+				websocket.send(JSON.stringify(message));
+			} else if (arrowUpPressed && arrowLeftPressed){
+				//intervalID = setInterval(function () {cameraY += 4.3 * zoomLevel,cameraX += 4.3 * zoomLevel;}, 40);
+				const message = {type:'userAction',data:'ArrowUp+Left'};
+				websocket.send(JSON.stringify(message));
+			} else if (arrowDownPressed && arrowRightPressed){
+				//intervalID = setInterval(function () {cameraY -= 4.3 * zoomLevel,cameraX -= 4.3 * zoomLevel;}, 40);
+				const message = {type:'userAction',data:'ArrowDown+Right'};
+				websocket.send(JSON.stringify(message));
+			} else if (arrowDownPressed && arrowLeftPressed){
+				//intervalID = setInterval(function () {cameraY -= 4.3 * zoomLevel,cameraX += 4.3 * zoomLevel;}, 40);
+				const message = {type:'userAction',data:'ArrowDown+Left'};
+				websocket.send(JSON.stringify(message));
+			} else
+
+
+
+			// 1o epipedo - 1 koumpi
+			if (arrowUpPressed) {
+			//intervalID = setInterval(function () {cameraY += 4.3 * zoomLevel;}, 40);
+    		const message = {type: 'userAction', data: 'ArrowUp'};
+    		websocket.send(JSON.stringify(message));
+  			} else if (arrowDownPressed)  {	
+			//intervalID = setInterval(function () {cameraY -= 4.3 * zoomLevel;}, 40);
+    		const message = {type: 'userAction', data: 'ArrowDown'};
+    		websocket.send(JSON.stringify(message));
+  			} else if (arrowRightPressed) {	
+			//intervalID = setInterval(function () {cameraX -= 4.3 * zoomLevel;}, 40);
+    		const message = {type: 'userAction', data: 'ArrowRight'};
+    		websocket.send(JSON.stringify(message));
+  			} else if (arrowLeftPressed) {
+			//intervalID = setInterval(function () {cameraX += 4.3 * zoomLevel;}, 40);
+    		const message = {type: 'userAction', data: 'ArrowLeft'};
+    		websocket.send(JSON.stringify(message));
+			}
+			
+		}
+
+
+		// ----------------------------------------- End of Functions -----------------------------------------
+
+
+
+		// ----------------------------------------- Start of Movement -----------------------------------------
+
+		canvas.addEventListener('keydown',function(event){
+
+			// ------------------------------------- Movement ---------------------------
+
+			if (event.repeat) {
+   				 return; // Ignore key repeats
+  			}
+
+			if (event.key === 'ArrowUp' || event.code === 'KeyW') {	
+    		arrowUpPressed = true;
+  			} else if (event.key === 'ArrowDown' || event.code === 'KeyS') {
+    		arrowDownPressed = true;
+  			} else if (event.key === 'ArrowRight' || event.code === 'KeyD') {
+    		arrowRightPressed = true;
+  			} else if (event.key === 'ArrowLeft' || event.code === 'KeyA') {
+    		arrowLeftPressed = true;
+  			}
+
+
+
+			if ((websocket != undefined) && (websocket.readyState == 1)){
+				// 4o epipedo - 4 koumpia
+				if (arrowUpPressed && arrowDownPressed && arrowRightPressed && arrowLeftPressed) {
+				//clearInterval(intervalID); 
+				const message = {type:'userAction',data:'ArrowNotClicked'};
+				websocket.send(JSON.stringify(message));
+				} else {
+
+				handleKeyAction();
+
+				}
+			}
+
+
+			// ------------------------------------- Respawn ---------------------------
+
+			if (event.code == 'Enter'){
+				if (deathFlag == true){
+					deathFlag = false;
+					const message2 = {type:'userRespawn'};
+					websocket.send(JSON.stringify(message2));
+					document.getElementById('death-layer').style.backgroundColor = 'transparent';
+					document.getElementById('death-element').style.transition = 'none';
+					document.getElementById('death-element').style.opacity = '0%';
+				}
+			}
+			
+		});
+
+		canvas.addEventListener('keyup',function(event){
+
+			if (event.key === 'ArrowUp' || event.code === 'KeyW') {
+    		arrowUpPressed = false;
+  			}
+			if (event.key === 'ArrowDown' || event.code === 'KeyS') {
+    		arrowDownPressed = false;
+  			}
+			if (event.key === 'ArrowRight' || event.code === 'KeyD') {
+    		arrowRightPressed = false;
+  			}
+			if (event.key === 'ArrowLeft' || event.code === 'KeyA') {
+    		arrowLeftPressed = false;
+  			}
+
+
+			if ((websocket != undefined) && (websocket.readyState == 1)){
+				handleKeyAction();
+
+
+				// 0 epipedo - kanena koumpi
+				if (!arrowUpPressed && !arrowDownPressed && !arrowRightPressed && !arrowLeftPressed){
+					//clearInterval(intervalID);
+					const message = {type:'userAction',data:'ArrowNotClicked'};
+					websocket.send(JSON.stringify(message));
+				}
+			}
+
+		});
+
+		// ----------------------------------------- End of Movement -----------------------------------------
+
+
+
+
+		// ----------------------------------------- Start of Projectiles -----------------------------------------
+
+		
+		canvas.addEventListener('mousedown',function(event){
+			
+			if ((websocket != undefined) && (websocket.readyState == 1)){
+				if (event.button == 0) {	
+					isShooting = true;
+					const message = {type:'userProjectile',shoot:'true'};
+					websocket.send(JSON.stringify(message))	
+				}
+			}	
+		
+		});
+
+		canvas.addEventListener('mousemove', onMouseMove);
+  
+  		function onMouseMove(event) {
+			const currentTime = Date.now();
+    		if (currentTime - lastMouseMoveTime >= throttleInterval) {
+      			lastMouseMoveTime = currentTime;
+				if ((websocket != undefined) && (websocket.readyState == 1)){   // need to limit to 40ms
+    				xaxis = event.clientX - canvas.width * scaleFactor / 2;
+    				yaxis = event.clientY - canvas.height * scaleFactor / 2;
+					angle = Math.atan2(yaxis, xaxis);
+					const message = {type:'userProjectile',shoot:'direction',data:angle};
+					websocket.send(JSON.stringify(message));
+				}
+			}	
+  		}
+	
+		canvas.addEventListener('mouseup',function(event){
+			
+			if ((websocket != undefined) && (websocket.readyState == 1)){
+				if (event.button == 0) {
+					isShooting = false;
+					const message = {type:'userProjectile',shoot:'false'};
+					websocket.send(JSON.stringify(message));
+				}
+			}
+			
+		});
+
+
+		// ----------------------------------------- End of Projectiles -----------------------------------------
+
+		
+
+
+
+		// ----------------------------------------- Start of Other Event Listeners -----------------------------------------
+
+
+		// to prevent right click
+		canvas.addEventListener('contextmenu', function (event) {
+            event.preventDefault();
+        });
+
+		// Update canvas size when the window is resized
+		window.addEventListener('resize', updateCanvasSize);
+		
+		// for zoom
+		canvas.addEventListener('wheel', handleMouseWheel);
+		
+		// to disable inputs when player clicks outside of canvas
+		window.addEventListener('blur', handleVisibilityChange);
+
+
+		
+
+
+		// ----------------------------------------- End of Other Event Listeners -----------------------------------------
+
+		
+
+	</script>
+</body>
+</html>

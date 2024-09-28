@@ -1,0 +1,24 @@
+{
+  "name": "tankio",
+  "version": "1.6.9",
+  "description": "A multiplayer game with tanks using websockets.",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [
+    "tanks",
+    "multiplayer",
+    "websockets"
+  ],
+  "author": "V. Kokkinogenis",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.17.1",
+    "express-rate-limit": "^7.0.2",
+    "express-ws": "^4.0.0",
+    "is-reachable": "^5.2.1",
+    "ws-rate-limit": "^0.0.0"
+  }
+}

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Start</title>
+</head>
+<body>
+    <h1>Welcome to the Game</h1>
+    <form id="gameForm">
+        <label for="playerName">Enter your name:</label>
+        <input type="text" id="playerName" required><br><br>
+        <label for="serverSelect">Select a server:</label>
+        <select id="serverSelect" required>
+        </select><br><br>
+
+        <button id="playButton">Play</button>
+    </form>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <script>
+
+
+
+
+        // Shared variables
+        var playerName;
+        var serverSelect;
+        var buttonPressed;
+        var serverData;
+        var port;
+
+
+        
+        executeWithOrder();
+        interval1 = setInterval(() => { 
+            executeWithOrder();
+        }, 2000);
+
+
+        
+
+
+        document.getElementById("playButton").addEventListener("click", async (event)=>{
+            event.preventDefault(); // Prevent the form from submitting
+            playerName = document.getElementById("playerName").value;
+            serverSelect = document.getElementById("serverSelect").value;
+            buttonPressed = true;
+
+            const targetServer = serverData.find((server) => server.name === serverSelect);
+            if (targetServer != undefined) { 
+                port = JSON.stringify(targetServer.port);
+            };
+            console.log(port);
+            console.log(serverData);
+            
+
+
+            const url = `/redirect?serverSelect=${serverSelect}`;
+            const result = await fetch(url,{
+                method:'GET',
+                headers: {
+                     "Content-Type": "application/json"
+                }           
+            });
+            
+            try {
+                const receivedText = await result.text();
+                if (result.ok) {
+                    
+                    const tempElement = document.createElement('div');
+                    tempElement.innerHTML = receivedText;
+
+                    clearInterval(interval1);
+                    // Insert the modified content into the document
+                    document.open();
+                    document.write(tempElement.innerHTML);
+                    document.close();
+                } else {
+                    throw new Error(receivedText);
+                }
+            } catch (error) {
+                // Handle errors (e.g., server not found)
+                alert(error.message);
+            }
+        });
+
+
+        
+
+        // ----------------------------------------- Start of Functions -----------------------------------------
+
+
+
+        async function fetchServerData(){         
+            const url = `/serverdata`;
+            const result = await fetch(url,{
+                method:'GET',
+                headers: {
+                     "Content-Type": "application/json"
+                }           
+            });
+            
+            try {
+                const receivedText = await result.text();
+                if (result.ok) {
+                   serverData = JSON.parse(receivedText);
+                } else {
+                    throw new Error(receivedText);
+                }
+            } catch (error) {
+                // Handle errors (e.g., server not found)
+                alert(error.message);
+            }
+        }
+
+        
+        function updateServerOptions() {
+            const serverSelectMenu = document.getElementById('serverSelect');
+            let selectedServer = serverSelectMenu.value;
+            // Clear existing options
+            serverSelectMenu.innerHTML = '';
+
+            // Iterate through serverData and add options
+            serverData.forEach(function(server){
+                const option = document.createElement('option');
+                option.value = server.name;
+                option.textContent = `Server ${server.name.charAt(server.name.length - 1)}`;
+                serverSelectMenu.appendChild(option);  
+                
+                if (option.value === selectedServer) {
+                    option.selected = true;
+                }
+            });
+        }
+        
+
+        async function executeWithOrder(){
+            await fetchServerData();
+            updateServerOptions();
+        }
+
+
+
+        // ----------------------------------------- End of Functions -----------------------------------------
+
+
+
+    </script>
+</body>
+</html>
