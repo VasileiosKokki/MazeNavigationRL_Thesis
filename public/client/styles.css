@@ -1,0 +1,59 @@
+canvas {
+    outline: none; /* Remove outline on focus */
+    transform-origin: left top;
+    image-rendering: pixelated;
+}
+#death-layer {
+    background-color:transparent;
+    z-index: 1;
+    position: absolute;
+    width: 100%; /* Adjust the width as needed */
+    height: 100%;
+    pointer-events: none;
+}
+.ui-bar {
+    user-select: none;
+    z-index: 1;
+    background-color: #33333377; /* Adjust the background color as needed */
+    position: absolute;
+    width: 300px; /* Adjust the width as needed */
+    height: 15px;
+    border-radius: 50px; /* Oval shape for the top */
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+#score-bar {
+    bottom: 35px;
+}
+#level-bar {
+    bottom: 10px;
+}
+.ui-fill {
+    width: 0%; /* Initial width is 0% */
+    height: 100%;
+    border-radius: 50px;
+    position: relative;
+    transition: width 0.5s ease; /* Add smooth transition effect */
+}
+#score-fill {
+    background-color: #df700e77;/* Progress color */
+}
+#level-fill {
+    background-color: #a41d0577;/* Progress color */
+}
+.ui-element {
+    font-size: 15px;
+    color: #ffffff;
+    left: 50%;
+    bottom: -2.5px;
+    transform: translateX(-50%);
+    position: absolute;
+    font-family: cursive;
+}
+#connection-element-2 {
+    bottom: 45%;
+    opacity: 0;
+    font-size: 30px;
+    color: red;
+}
