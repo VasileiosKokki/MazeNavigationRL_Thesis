@@ -5,78 +5,16 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Multiplayer game client</title>
 	<style>
-        body, html { 
+		body, html {
 			width: 100%;
-  			height: 100%;
-  			margin: 0px;
-  			border: 0;
+			height: 100%;
+			margin: 0px;
+			border: 0;
 			padding: 0;
-  			overflow: hidden;
-  			/*  Disable scrollbars */
-  			display: block;
-  			/* No floating content on sides */
-        }
-		canvas {
-    		outline: none; /* Remove outline on focus */
-			transform-origin: left top;
-			image-rendering: pixelated;
-  		}
-		#death-layer {
-			background-color:transparent;
-			z-index: 1;
-			position: absolute;
-			width: 100%; /* Adjust the width as needed */
-			height: 100%;
-			pointer-events: none;
-		}
-		#connection-layer {
-			background-color:darkblue;
-			z-index: 1;
-			position: absolute;
-			width: 100%; /* Adjust the width as needed */
-			height: 100%;
-			pointer-events: none;
-			transition: background-color 0.5s ease
-		}
-		.ui-bar {
-			user-select: none;
-			z-index: 1; 
-			background-color: #33333377; /* Adjust the background color as needed */
-			position: absolute;
-			width: 300px; /* Adjust the width as needed */
-			height: 15px;
-			border-radius: 50px; /* Oval shape for the top */
-			left: 50%;
-			transform: translateX(-50%);
-			pointer-events: none;
-		}
-		#score-bar {
-			bottom: 35px;
-		}
-		#level-bar {
-			bottom: 10px;
-		}
-		.ui-fill {
- 			width: 0%; /* Initial width is 0% */
-  			height: 100%;
-			border-radius: 50px;
-  			position: relative;
-  			transition: width 0.5s ease; /* Add smooth transition effect */
-		}
-		#score-fill {
-			background-color: #df700e77;/* Progress color */
-		}
-		#level-fill {
-			background-color: #a41d0577;/* Progress color */
-		}
-		.ui-element {
-			font-size: 15px;
-  			color: #ffffff;
-			left: 50%;
-			bottom: -2.5px;
-			transform: translateX(-50%);
-			position: absolute;
-			font-family: cursive;
+			overflow: hidden;
+			/*  Disable scrollbars */
+			display: block;
+			/* No floating content on sides */
 		}
 		#death-element {
 			opacity: 0%;
@@ -88,21 +26,25 @@
 			opacity: 1;
 			transition: opacity 0.5s ease
 		}
-		#connection-element-2 {
-			bottom: 45%;
-			opacity: 0;
-			font-size: 30px;
-			color: red;
+		#connection-layer {
+			background-color:darkblue;
+			z-index: 1;
+			position: absolute;
+			width: 100%; /* Adjust the width as needed */
+			height: 100%;
+			pointer-events: none;
+			transition: background-color 0.5s ease
 		}
-    </style>
+	</style>
+	<link rel="stylesheet" href="./styles.css">
 </head>
 <body>
 	<div id="connection-layer" class="ui-layer">
 		<div id="connection-element-1" class="ui-element">
-			<span id="connection-text">(Waiting for WebSocket Connection)</span>
+			<span id="connection-text-1">(Waiting for WebSocket Connection)</span>
 		</div>
 		<div id="connection-element-2" class="ui-element">
-			<span id="connection-text">Connection Failed</span>
+			<span id="connection-text-2">Connection Failed</span>
 		</div>
 	</div>
 	<div id="death-layer" class="ui-layer">
@@ -123,23 +65,28 @@
 		</div>
 	</div>
 	<canvas id="gameArea" tabindex="1"></canvas>
-	<script type="text/javascript">
+	<script type="module">
 
 		
 		
-		
+		//import { handleKeyAction } from './functions.js'
 
 
+		import {
+			getBaseDivisorAtLevel, handleKeyAction,
+			handleMouseWheel, handleVisibilityChange,
+			handleWebSocketErrorOrClose, onMouseMove,
+			updateCanvasSize
+		} from "../client/functions.js";
 
-
-		const worker = new Worker("worker.js");
+		const worker = new Worker("worker.js", { type: "module" });
 		const canvas = document.getElementById('gameArea');
 		const scaleFactor = 1 / window.devicePixelRatio;
 		canvas.style.transform = `scale(${scaleFactor})`;
 		const offscreen = canvas.transferControlToOffscreen();
 		worker.postMessage({ type:'canvas', data:offscreen }, [offscreen]);
 		let disconnected = false;
-		updateCanvasSize();
+		updateCanvasSize(scaleFactor, worker);
 	
 
 
@@ -149,11 +96,11 @@
 		canvas.focus();     //poli kako gia to live preview 
 
 		let zoomLevel = 1;
-		var yaxis;
-		var xaxis;
-		var mouseDownInterval;
-		var angle;
-		//var thisclientId;
+		let yaxis;
+		let xaxis;
+		let mouseDownInterval;
+		let angle;
+		//let thisclientId;
 		let arrowUpPressed = false;
 		let arrowDownPressed = false;
 		let arrowRightPressed = false;
@@ -164,8 +111,8 @@
 		let lastMouseMoveTime = 0;
 		let score;
 		let highScore;
-		//var intervalID;
-		var drawables = [];
+		//let intervalID;
+		let drawables = [];
 
 		function Drawable(clientId, name, width, height, topLeftX, topLeftY, color, maxHealth, currentHealth, shape, type, shootingAngle){
 		this.clientId = clientId;
@@ -182,25 +129,7 @@
 		this.shootingAngle = shootingAngle;
 		};
 
-		var url = window.location.href;
-
-		var parsedUrl = new URL(url);
-
-		// Get the query parameters using URLSearchParams
-		var queryParams = new URLSearchParams(parsedUrl.search);
-
-		// Shared variables
-		var buttonPressed;
-		var serverSelect;
-		var playerName;
-
-		// Get the value of the 'serverSelect' parameter
-		if (buttonPressed == undefined){
-			serverSelect = queryParams.get('serverSelect');
-			playerName = queryParams.get('playerName');
-		}
-		
-
+		let url = window.location.href;
 		
 		if (url.startsWith('http://')) {
   		  // Remove 'http://' from the beginning
@@ -211,16 +140,17 @@
 		}
 
 		// Split the URL by '/' to get the domain
-		var parts = url.split(':');
-		var domain = parts[0]; // The first part is the domain
-		var websocket;
-		var port;
-		
+		let parts = url.split(':');
+		let domain = parts[0]; // The first part is the domain
+		console.log(parts);
+		let websocket;
+		let playerName = window.playerName;
+		const port = window.port
+
+		let maxScore;
+		let scorePercentage;
 
 		
-
-
-		// ----------------------------------------- Start of Presentation Logic -----------------------------------------
 
 
 			if (port != undefined){
@@ -248,7 +178,7 @@
 						const flagSize = "1".length; // Adjust the flag size as needed
   						const flagBuffer = receivedUint8Array.slice(-flagSize);
   						const flag = new TextDecoder().decode(flagBuffer);
-						var dataWithoutFlag = receivedUint8Array.slice(0, -flagSize);
+						let dataWithoutFlag = receivedUint8Array.slice(0, -flagSize);
 					
   						if (flag === "1") {
 							if (!document.hidden){
@@ -276,13 +206,6 @@
 				handleWebSocketErrorOrClose();
 			}
 			
-		
-		// ----------------------------------------- End of Presentation Logic -----------------------------------------
-
-	
-
-		
-		// ----------------------------------------- Start of Other Functions -----------------------------------------
 
 
 		function passToWorkerOrNot(message){
@@ -290,10 +213,10 @@
 				case 'model':
 						// ----------------------------------------- Model -----------------------------------------
 						drawables.length = 0;
-						arrayOfArrays = message.data;
-						for (var i = 0; i < arrayOfArrays.length; i++) {
-						var attributesArray = arrayOfArrays[i];
-						var drawable = new Drawable(
+						const arrayOfArrays = message.data;
+						for (let i = 0; i < arrayOfArrays.length; i++) {
+						let attributesArray = arrayOfArrays[i];
+						let drawable = new Drawable(
 						    attributesArray[0], // clientId
 						    attributesArray[1], // name
 						    attributesArray[2], // width
@@ -314,22 +237,22 @@
 						worker.postMessage({ type:'model', data:JSON.stringify(drawables) });
 					break;
 				case 'connected':
-						properId = message.data.clientId;
-						gameBoundsWidth = message.data.bounds.width;
-						gameBoundsHeight = message.data.bounds.height;
-						collumns = message.data.grid.cols;
-						rows = message.data.grid.rows;
-						const connectedData = {properId,gameBoundsWidth,gameBoundsHeight,collumns,rows}
+						const properId = message.data.clientId;
+						const gameBoundsDimensions = message.data.gameBoundsDimensions;
+						const spatialGridDimensions = message.data.spatialGridDimensions;
+						const pathGridDimensions = message.data.pathGridDimensions;
+						const unwalkableCells = message.data.unwalkableCells;
+						const connectedData = {properId,gameBoundsDimensions,spatialGridDimensions,pathGridDimensions,unwalkableCells}
 						worker.postMessage({ type:'connected', data:JSON.stringify(connectedData) });
 					break;
 				case 'experience':
-						level = message.data.level;
-						experience = message.data.experience;
+						const level = message.data.level;
+						const experience = message.data.experience;
 						score = message.data.score;
 						// we dont pass to worker because we use css instead of canvas
-						maxExperience = getBaseDivisorAtLevel(level);
+						const maxExperience = getBaseDivisorAtLevel(level);
 						//console.log(maxExperience);
-						experiencePercentage = experience / maxExperience;
+						const experiencePercentage = experience / maxExperience;
 						document.getElementById('level-value').textContent = level;
 						document.getElementById('score-value').textContent = score;
 						document.getElementById('level-fill').style.width = `${experiencePercentage*100}%`;
@@ -362,163 +285,6 @@
 		}
 
 
-		function handleWebSocketErrorOrClose(event) {
-			if (event != undefined){
-				if (event.type === 'error') {
-					console.error('WebSocket Error:', event);
-				} else if (event.type === 'close') {
-					console.error('WebSocket Connection Is Closed');
-				}
-			} else {
-				console.error('Try Going Through ServerHub This Time')
-			}
-			disconnected = true;
-			document.getElementById('connection-element-2').style.opacity = '1';
-		}
-
-
-		function getBaseDivisorAtLevel(level) {
-  			let baseDivisor = 1000; // Initial base divisor
-  			for (let i = 1; i < level; i++) {
-    			baseDivisor = Math.round(baseDivisor * 1.1); // Increase the divisor (adjust this factor)
-  			}
-  			return baseDivisor;
-		}
-
-
-
-		function updateCanvasSize() {
-			if (disconnected == false){
-
-            canvasWidth = window.innerWidth / scaleFactor;
-            canvasHeight = window.innerHeight / scaleFactor;
-
-			const sizeData = {canvasWidth,canvasHeight}
-			worker.postMessage({ type:'resize', data:JSON.stringify(sizeData) });
-			}
-        }
-
-
-
-
-		// zoom in out
-		function handleMouseWheel(event) {
-      		const delta = Math.sign(event.deltaY);
-			var zoomStep = 0.05;
-      		if (delta === -1) {
-				zoomLevel += zoomStep;
-				if (zoomLevel >= 1.55) {
-          			zoomLevel = 1.5;
-					return;
-        		}
-      		} else if (delta === 1) {
-        		zoomLevel -= zoomStep;
-				if (zoomLevel <= 0.7) {
-          			zoomLevel = 0.75;
-					return;
-				}
-      		}
-			const zoomLevelData = {zoomLevel,zoomStep,delta}
-			worker.postMessage({ type:'zoomlevel', data:JSON.stringify(zoomLevelData) });
-    	}
-
-	
-		
-		// swap tabs while key is pressed
-		function handleVisibilityChange() {
-			if ((websocket != undefined) && (websocket.readyState == 1)){
-      			if ((arrowUpPressed || arrowDownPressed || arrowRightPressed || arrowLeftPressed) || isShooting) {
-				
-					//clearInterval(intervalID);
-					arrowUpPressed = false;
-					arrowDownPressed = false;
-					arrowRightPressed = false;
-					arrowLeftPressed = false;
-					const message = {type:'userAction',data:'ArrowNotClicked'};
-					websocket.send(JSON.stringify(message));
-					isShooting = false;
-					const message2 = {type:'userProjectile',shoot:'false',data:angle};
-					websocket.send(JSON.stringify(message2));
-				}
-      		}
-    	}
-
-
-
-		function handleKeyAction() {  // koino kai gia to keydown kai gia to keyup event listener
-			// oti einai prasino den xreiazetai pleon alla xreiazotan otan den eixame to recenter function
-
-
-			//clearInterval(intervalID);
-
-			// 3o epipedo - 3 koumpia
-			if (arrowUpPressed && arrowRightPressed && arrowLeftPressed) {  
-			//intervalID = setInterval(function () {cameraY += 4.3 * zoomLevel;}, 40);
-    		const message = {type: 'userAction', data: 'ArrowUp'};
-    		websocket.send(JSON.stringify(message));
-  			} else if (arrowDownPressed && arrowRightPressed && arrowLeftPressed)  {
-			//intervalID = setInterval(function () {cameraY -= 4.3 * zoomLevel;}, 40);
-    		const message = {type: 'userAction', data: 'ArrowDown'};
-    		websocket.send(JSON.stringify(message));
-  			} else if (arrowRightPressed && arrowUpPressed && arrowDownPressed) {
-			//intervalID = setInterval(function () {cameraX -= 4.3 * zoomLevel;}, 40);
-    		const message = {type: 'userAction', data: 'ArrowRight'};
-    		websocket.send(JSON.stringify(message));
-  			} else if (arrowLeftPressed && arrowUpPressed && arrowDownPressed) {
-			//intervalID = setInterval(function () {cameraX += 4.3 * zoomLevel;}, 40);
-    		const message = {type: 'userAction', data: 'ArrowLeft'};
-    		websocket.send(JSON.stringify(message));
-			} else
-
-
-
-			// 2o epipedo - 2 koumpia
-			if ((arrowUpPressed && arrowDownPressed) || (arrowRightPressed && arrowLeftPressed)) {
-				const message = {type:'userAction',data:'ArrowNotClicked'};
-				websocket.send(JSON.stringify(message));
-			} else  if (arrowUpPressed && arrowRightPressed){
-				//intervalID = setInterval(function () {cameraY += 4.3 * zoomLevel,cameraX -= 4.3 * zoomLevel;}, 40);
-				const message = {type:'userAction',data:'ArrowUp+Right'};
-				websocket.send(JSON.stringify(message));
-			} else if (arrowUpPressed && arrowLeftPressed){
-				//intervalID = setInterval(function () {cameraY += 4.3 * zoomLevel,cameraX += 4.3 * zoomLevel;}, 40);
-				const message = {type:'userAction',data:'ArrowUp+Left'};
-				websocket.send(JSON.stringify(message));
-			} else if (arrowDownPressed && arrowRightPressed){
-				//intervalID = setInterval(function () {cameraY -= 4.3 * zoomLevel,cameraX -= 4.3 * zoomLevel;}, 40);
-				const message = {type:'userAction',data:'ArrowDown+Right'};
-				websocket.send(JSON.stringify(message));
-			} else if (arrowDownPressed && arrowLeftPressed){
-				//intervalID = setInterval(function () {cameraY -= 4.3 * zoomLevel,cameraX += 4.3 * zoomLevel;}, 40);
-				const message = {type:'userAction',data:'ArrowDown+Left'};
-				websocket.send(JSON.stringify(message));
-			} else
-
-
-
-			// 1o epipedo - 1 koumpi
-			if (arrowUpPressed) {
-			//intervalID = setInterval(function () {cameraY += 4.3 * zoomLevel;}, 40);
-    		const message = {type: 'userAction', data: 'ArrowUp'};
-    		websocket.send(JSON.stringify(message));
-  			} else if (arrowDownPressed)  {	
-			//intervalID = setInterval(function () {cameraY -= 4.3 * zoomLevel;}, 40);
-    		const message = {type: 'userAction', data: 'ArrowDown'};
-    		websocket.send(JSON.stringify(message));
-  			} else if (arrowRightPressed) {	
-			//intervalID = setInterval(function () {cameraX -= 4.3 * zoomLevel;}, 40);
-    		const message = {type: 'userAction', data: 'ArrowRight'};
-    		websocket.send(JSON.stringify(message));
-  			} else if (arrowLeftPressed) {
-			//intervalID = setInterval(function () {cameraX += 4.3 * zoomLevel;}, 40);
-    		const message = {type: 'userAction', data: 'ArrowLeft'};
-    		websocket.send(JSON.stringify(message));
-			}
-			
-		}
-
-
-		// ----------------------------------------- End of Functions -----------------------------------------
 
 
 
@@ -552,7 +318,7 @@
 				websocket.send(JSON.stringify(message));
 				} else {
 
-				handleKeyAction();
+				handleKeyAction(websocket, arrowUpPressed, arrowDownPressed, arrowRightPressed, arrowLeftPressed);
 
 				}
 			}
@@ -590,7 +356,7 @@
 
 
 			if ((websocket != undefined) && (websocket.readyState == 1)){
-				handleKeyAction();
+				handleKeyAction(websocket, arrowUpPressed, arrowDownPressed, arrowRightPressed, arrowLeftPressed);
 
 
 				// 0 epipedo - kanena koumpi
@@ -623,21 +389,8 @@
 		
 		});
 
-		canvas.addEventListener('mousemove', onMouseMove);
-  
-  		function onMouseMove(event) {
-			const currentTime = Date.now();
-    		if (currentTime - lastMouseMoveTime >= throttleInterval) {
-      			lastMouseMoveTime = currentTime;
-				if ((websocket != undefined) && (websocket.readyState == 1)){   // need to limit to 40ms
-    				xaxis = event.clientX - canvas.width * scaleFactor / 2;
-    				yaxis = event.clientY - canvas.height * scaleFactor / 2;
-					angle = Math.atan2(yaxis, xaxis);
-					const message = {type:'userProjectile',shoot:'direction',data:angle};
-					websocket.send(JSON.stringify(message));
-				}
-			}	
-  		}
+		canvas.addEventListener('mousemove', (event) => ({ lastMouseMoveTime, angle } = onMouseMove(event, lastMouseMoveTime, angle, throttleInterval, websocket, canvas, scaleFactor)));
+
 	
 		canvas.addEventListener('mouseup',function(event){
 			
@@ -666,14 +419,14 @@
             event.preventDefault();
         });
 
-		// Update canvas size when the window is resized
-		window.addEventListener('resize', updateCanvasSize);
-		
 		// for zoom
-		canvas.addEventListener('wheel', handleMouseWheel);
+		canvas.addEventListener('wheel', (event) => zoomLevel = handleMouseWheel(event, worker, zoomLevel));
+
+		// Update canvas size when the window is resized
+		window.addEventListener('resize', () => updateCanvasSize(scaleFactor, worker));
 		
 		// to disable inputs when player clicks outside of canvas
-		window.addEventListener('blur', handleVisibilityChange);
+		window.addEventListener('blur', () => ({ arrowUpPressed, arrowDownPressed, arrowRightPressed, arrowLeftPressed, isShooting } = handleVisibilityChange(websocket, arrowUpPressed, arrowDownPressed, arrowRightPressed, arrowLeftPressed, isShooting, angle)));
 
 
 		
