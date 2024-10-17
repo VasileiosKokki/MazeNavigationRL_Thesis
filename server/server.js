@@ -14,9 +14,12 @@ import {
 	checkCollision,
 	clamp,
 	isInUnwalkableCell,
-	createAgent, range, generateRandomWalls
+	createAgent, range, generateRandomWalls, sendDrawablesToPython, sendOneTimeDataToPython
 } from './functions.js';
 import { router } from './routes.js'
+import { spawn } from 'child_process';
+
+const pythonProcess = spawn('python', ['./python/main.py']);
 
 const limiter = rateLimit({
 	windowMs: 1 * 60 * 1000, // 1 minute
@@ -31,9 +34,40 @@ app.use(router);
 
 
 
+let dataBuffer = '';  // To accumulate incoming data
+
+pythonProcess.stdout.on('data', (data) => {
+	dataBuffer += data.toString();  // Accumulate data as string
+
+	// Check if the buffer contains a complete message (e.g., using newline as delimiter)
+	let messages = dataBuffer.split('\n');
+
+	// Process each message except the last one, which may be incomplete
+	messages.slice(0, -1).forEach(message => {
+		try {
+			const parsedData = JSON.parse(message);  // Try to parse each complete JSON string
+
+			parsedData.forEach(newDrawable => {
+				const index = drawables.findIndex(existingDrawable => existingDrawable.clientId === newDrawable.clientId);
+				if (index !== -1) {
+					drawables[index] = newDrawable;  // Update drawable
+				}
+			});
+
+		} catch (e) {
+			//console.error('Failed to parse JSON:', e);
+			console.log(message)
+		}
+	});
+
+	// Keep the last (incomplete) part in the buffer
+	dataBuffer = messages[messages.length - 1];
+});
 
 
-
+pythonProcess.stderr.on('data', (data) => {
+	console.log(`${data}`);
+});
 
 
 function Drawable(clientId, name, width, height, topLeftX, topLeftY, color, speed, direction, maxHealth, currentHealth, healthRegenRate, healthRegenDelay, bodyDamage, lastDamageTime, lastDamagerId, shape, type, parentId, projectileVelocity, projectileHealth, projectileDamage, shootingAngle, isShooting, lastProjectileTime, rateOfFire, level, score, experience, isToBeRespawned){
@@ -136,11 +170,11 @@ const secretKey = "fd867a587aa02407952a83e59675e99e4c8de5bb6640db609eb8e7fdfb358
 
 const gameBoundsDimensions = {width:5000,height:5000};  // gamebounds
 const spatialGridDimensions = {rows:20,cols:20}
-const pathGridDimensions = {rows:40,cols:40}
+const pathGridDimensions = {rows:20,cols:20}
 
 
 
-const unwalkableCells = generateRandomWalls(50);
+const unwalkableCells = generateRandomWalls(0);
 
 const unwalkableCellsExpanded = unwalkableCells.flatMap(([xStart, yStart, xEnd, yEnd]) =>
 	range(xStart, yStart, xEnd, yEnd)
@@ -182,14 +216,14 @@ setInterval(() => {
 	sendServerInfo(thisServer, secretKey);
 }, 2000);
 
-
+sendOneTimeDataToPython(gameBoundsDimensions, pathGridDimensions, unwalkableCellsExpanded, pythonProcess)
 
 
 
 for (let i = 0; i < 100; i++){     // up to 10000 lagless without shooting
 	clientCounter = createFood(clientCounter, drawables, gameBoundsDimensions);
 }
-for (let i = 0; i < 20; i++) {
+for (let i = 0; i < 1; i++) {
 	clientCounter = createAgent(clientCounter, drawables, gameBoundsDimensions);
 }
 
@@ -438,6 +472,7 @@ function MessageLogic(){
 
 // ----------------------------------------- Main -----------------------------------------
 
+
 let interval = setInterval(function(){
 	GameLogic();	// the more we add the better the collision detection for projectiles with high velocity but worse performance for the server
 	GameLogic();
@@ -449,6 +484,7 @@ let interval = setInterval(function(){
 	GameLogic();
 	// 8
 	MessageLogic();
+	sendDrawablesToPython(drawables, pythonProcess)
 },40);
 
 

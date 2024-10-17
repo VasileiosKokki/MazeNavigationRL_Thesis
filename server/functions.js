@@ -761,6 +761,21 @@ const generateRandomWalls = (numWalls) => {
     return walls;
 };
 
+function sendDrawablesToPython(drawables, pythonProcess) {
+    pythonProcess.stdin.write(JSON.stringify({
+        type: 'drawables',
+        data: drawables
+    }) + '\n');  // Send data via stdin
+}
+
+function sendOneTimeDataToPython(gameBoundsDimensions, pathGridDimensions, unwalkableCellsExpanded, pythonProcess) {
+    // Convert the data to JSON and send it to Python
+    pythonProcess.stdin.write(JSON.stringify({
+        type: 'oneTimeData',
+        data: {gameBoundsDimensions,pathGridDimensions, unwalkableCellsExpanded}
+    }) + '\n'); // Sending one-time data
+}
 
 
-export { disconnect, sendPlayerCount, findHighestScore, addListeners, respawnPlayer, turnLevelToExperience, updateLevel, checkForDeath, createFood, checkForRespawn, createProjectile, sendServerInfo, checkCollision, knockbackWithDmg, clamp, range, isInUnwalkableCell, createAgent, generateRandomWalls, getRandomInt }
+
+export { disconnect, sendPlayerCount, findHighestScore, addListeners, respawnPlayer, turnLevelToExperience, updateLevel, checkForDeath, createFood, checkForRespawn, createProjectile, sendServerInfo, checkCollision, knockbackWithDmg, clamp, range, isInUnwalkableCell, createAgent, generateRandomWalls, getRandomInt, sendDrawablesToPython, sendOneTimeDataToPython }

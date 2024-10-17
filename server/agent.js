@@ -28,6 +28,7 @@ const cell = {width: gameBoundsDimensions.width/pathGridDimensions.cols, height:
 
 
 const pathGrid = new PF.Grid(pathGridDimensions.cols, pathGridDimensions.rows);
+const finder = new PF.AStarFinder();
 unwalkableCellsExpanded.forEach(([x, y]) => {
     pathGrid.setWalkableAt(x, y, false);
 });
@@ -59,8 +60,7 @@ let interval = setInterval(function(){
             ) {
 
 
-                // Find the path using the A* algorithm
-                const finder = new PF.AStarFinder();
+
                 gridBackup = pathGrid.clone();
                 const path = finder.findPath(startCell.x, startCell.y, endCell.x, endCell.y, gridBackup);
 
