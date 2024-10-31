@@ -306,7 +306,7 @@ function checkForDeath(drawables, drawablesToBeRewarded, deadButConnected, clien
     drawables = drawables.filter(function(drawable){
         if (drawable.currentHealth <= 0){
             // experience distribution
-            if (drawable.type == 'food' || drawable.type == 'player'){
+            if (drawable.type == 'food' || drawable.type == 'player' || drawable.type == 'agent'){
                 const pair = { lastDamagerId: drawable.lastDamagerId, experience: Math.round((drawable.experience + turnLevelToExperience(drawable.level)) / 2) };
                 drawablesToBeRewarded.push(pair);
                 // food replenish
@@ -315,6 +315,13 @@ function checkForDeath(drawables, drawablesToBeRewarded, deadButConnected, clien
                         const drawables = getDrawables();
                         const clientCounter = getClientCounter();
                         const updatedClientCounter = createFood(clientCounter, drawables, gameBoundsDimensions)
+                        setClientCounter(updatedClientCounter)
+                    }, 10000);
+                } else if (drawable.type == 'agent'){
+                    setTimeout(() => {
+                        const drawables = getDrawables();
+                        const clientCounter = getClientCounter();
+                        const updatedClientCounter = createAgent(clientCounter, drawables, gameBoundsDimensions)
                         setClientCounter(updatedClientCounter)
                     }, 10000);
                 } else
@@ -683,6 +690,52 @@ function isInUnwalkableCell(drawable, unwalkableCells, gameBoundsDimensions, pat
     });
 }
 
+function createAgent(clientCounter, drawables, gameBoundsDimensions){
+    const clientId = clientCounter;
+    clientCounter++;
+
+    const name = '';
+    let width = 35;
+    let height = 35;
+    const topLeftX = Math.random()*(gameBoundsDimensions.width-30);
+    const topLeftY = Math.random()*(gameBoundsDimensions.height-30);
+    let color;
+    if (clientId % 2 == 0){
+        color = '#AA0000'
+    } else {
+        color = '#00AAAA'
+    }
+    let speed = 5;
+    let direction = null;
+    let maxHealth = 2000;
+    let currentHealth = maxHealth;
+    let healthRegenRate = 0.5 / 100 * maxHealth;  // change only the first part of the variable
+    let healthRegenDelay = 10 * 1000;  // change only the first part of the variable (in seconds)
+    let bodyDamage = 20;
+    let lastDamageTime = null;
+    let lastDamagerId = null;
+    const shape = 'oval';
+    const type = 'agent';
+    const parentId = null;
+    let projectileVelocity = null;
+    let projectileHealth = null;
+    let projectileDamage = null;
+    let shootingAngle = null;
+    let isShooting = null;
+    let lastProjectileTime = null;
+    let rateOfFire = null;
+    let level = 1;
+    let score = null;
+    let experience = 1000;
+    let isToBeRespawned = null;
+
+
+    let drawable = new Drawable(clientId, name, width, height, topLeftX, topLeftY, color, speed, direction, maxHealth, currentHealth, healthRegenRate, healthRegenDelay, bodyDamage, lastDamageTime, lastDamagerId, shape, type, parentId, projectileVelocity, projectileHealth, projectileDamage, shootingAngle, isShooting, lastProjectileTime, rateOfFire, level, score, experience, isToBeRespawned);
+    drawables.push(drawable);
+
+    return clientCounter
+}
+
 
 const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
@@ -710,4 +763,4 @@ const generateRandomWalls = (numWalls) => {
 
 
 
-export { disconnect, sendPlayerCount, findHighestScore, addListeners, respawnPlayer, turnLevelToExperience, updateLevel, checkForDeath, createFood, checkForRespawn, createProjectile, sendServerInfo, checkCollision, knockbackWithDmg, clamp, range, isInUnwalkableCell, generateRandomWalls, getRandomInt }
+export { disconnect, sendPlayerCount, findHighestScore, addListeners, respawnPlayer, turnLevelToExperience, updateLevel, checkForDeath, createFood, checkForRespawn, createProjectile, sendServerInfo, checkCollision, knockbackWithDmg, clamp, range, isInUnwalkableCell, createAgent, generateRandomWalls, getRandomInt }

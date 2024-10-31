@@ -14,7 +14,7 @@ import {
 	checkCollision,
 	clamp,
 	isInUnwalkableCell,
-	range, generateRandomWalls
+	createAgent, range, generateRandomWalls
 } from './functions.js';
 import { router } from './routes.js'
 
@@ -129,6 +129,9 @@ let currentHighestScore = 0;
 
 let domain;
 let port = parseInt(process.env.PORT, 10);
+if (isNaN(port)) {
+	port = 3002; // Set default port if invalid
+}
 const secretKey = "fd867a587aa02407952a83e59675e99e4c8de5bb6640db609eb8e7fdfb358373";
 
 
@@ -189,7 +192,9 @@ setInterval(() => {
 for (let i = 0; i < 100; i++){     // up to 10000 lagless without shooting
 	clientCounter = createFood(clientCounter, drawables, gameBoundsDimensions);
 }
-
+for (let i = 0; i < 5; i++) {
+	clientCounter = createAgent(clientCounter, drawables, gameBoundsDimensions);
+}
 
 
 function setDrawables(value) {
