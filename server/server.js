@@ -136,11 +136,11 @@ const secretKey = "fd867a587aa02407952a83e59675e99e4c8de5bb6640db609eb8e7fdfb358
 
 const gameBoundsDimensions = {width:5000,height:5000};  // gamebounds
 const spatialGridDimensions = {rows:20,cols:20}
-const pathGridDimensions = {rows:40,cols:40}
+const pathGridDimensions = {rows:20,cols:20}
 
 
 
-const unwalkableCells = generateRandomWalls(50);
+const unwalkableCells = generateRandomWalls(20);
 
 const unwalkableCellsExpanded = unwalkableCells.flatMap(([xStart, yStart, xEnd, yEnd]) =>
 	range(xStart, yStart, xEnd, yEnd)
@@ -189,7 +189,7 @@ setInterval(() => {
 for (let i = 0; i < 100; i++){     // up to 10000 lagless without shooting
 	clientCounter = createFood(clientCounter, drawables, gameBoundsDimensions);
 }
-for (let i = 0; i < 5; i++) {
+for (let i = 0; i < 2; i++) {
 	clientCounter = createAgent(clientCounter, drawables, gameBoundsDimensions);
 }
 
