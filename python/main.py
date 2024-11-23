@@ -8,6 +8,8 @@ import pydevd_pycharm
 import gymnasium as gym
 import time
 from matplotlib import pyplot as plt
+from sb3_contrib import MaskablePPO
+from sb3_contrib.common.maskable.utils import get_action_masks
 from stable_baselines3 import A2C, PPO, DQN
 import os
 
@@ -28,6 +30,7 @@ from tqdm import tqdm
 #     pass
 
 cell = None
+path_grid_dimensions = None
 agents = None
 targets = None
 env = None
@@ -50,11 +53,11 @@ def test_sb3(render=True):
     #env = gym.make('FrozenLake-v1', render_mode="human", is_slippery=False, map_name="8x8")
 
     # Load model
-    model = A2C.load('models/a2c_10000', env=env)
+    model = MaskablePPO.load('models/MaskablePPO_4816904', env=env)
 
     # Run a test
     for _ in range(3):
-        obs, info = env.reset(agent=agents[0], target=targets[0])
+        obs, info = env.reset()
         terminated = False
         while True:
             debug_print([targets[0]['cellX'], targets[0]['cellY']])
@@ -62,7 +65,7 @@ def test_sb3(render=True):
             #debug_print(action)
             env._agent_location = np.array([agents[0]['cellX'], agents[0]['cellY']], dtype=int)
             env._target_location = np.array([targets[0]['cellX'], targets[0]['cellY']], dtype=int)
-            obs, info = env.reset(agent=agents[0], target=targets[0])
+            # obs, info = env.reset()
             #print(targets[0])
             obs, _, terminated, _, _ = env.step(action.item())
 
@@ -72,8 +75,8 @@ def test_sb3(render=True):
 
     env.close()
 
-# if agents is not None:
-#     test_sb3()
+if agents is not None:
+    test_sb3()
 test_sb3_called = False
 for line in sys.stdin:
     try:
@@ -106,7 +109,7 @@ for line in sys.stdin:
                 }
                 target['cellX'] = endCell['x']
                 target['cellY'] = endCell['y']
-                debug_print([targets[0]['cellX'], targets[0]['cellY']])
+                # debug_print([targets[0]['cellX'], targets[0]['cellY']])
                 # env._target_location = np.array([target['cellX'], target['cellY']], dtype=int)
 
             if agents and targets and not test_sb3_called:
@@ -117,39 +120,41 @@ for line in sys.stdin:
                 #env = gym.make('FrozenLake-v1', render_mode="human", is_slippery=False, map_name="8x8")
 
                 # Load model
-                model = A2C.load('models/a2c_10000', env=env)
+                model = MaskablePPO.load('models/MaskablePPO_4014096', env=env)
 
-                obs, info = env.reset(agent=agents[0], target=targets[0])
+                # obs, info = env.reset()
+                env.unwrapped.updateDrawables(agent=agents[0], target=targets[0])
+                obs, info = env.reset()
                 terminated = False
 
             if agents and targets:
-                debug_print([targets[0]['cellX'], targets[0]['cellY']])
-                action, _ = model.predict(observation=obs, deterministic=True) # Turn on deterministic, so predict always returns the same behavior
-                #debug_print(action)
+                # debug_print([targets[0]['cellX'], targets[0]['cellY']])
+                env.unwrapped.updateDrawables(agent=agents[0], target=targets[0])
+                # obs, info = env.reset()
+                action_masks = get_action_masks(env)
+                print(action_masks)
+                obs = env.unwrapped._get_obs()
+                action, _ = model.predict(observation=obs, deterministic=True, action_masks=action_masks) # Turn on deterministic, so predict always returns the same behavior
+                debug_print(action)
                 # env._agent_location = np.array([agents[0]['cellX'], agents[0]['cellY']], dtype=int)
                 # env._target_location = np.array([targets[0]['cellX'], targets[0]['cellY']], dtype=int)
                 #obs, info = env.reset(agent=agents[0], target=targets[0])
-                env.unwrapped.updateDrawables(agent=agents[0], target=targets[0])
                 #print(targets[0])
                 current_time = time.monotonic()
                 if current_time - last_execution_time >= DELAY_INTERVAL:
                     obs, _, terminated, _, _ = env.step(action.item())
 
-                    # agents[0]['topLeftX'] = obs["agent"][0] * cell['width'] + cell['width']/2
-                    # agents[0]['topLeftY'] = obs["agent"][1] * cell['height'] + cell['height']/2
                     if (not terminated):
                         agent_direction = env.unwrapped.get_action_direction(action.item())
-                        size = 20
-                        agent_location = obs["agent"]
+                        size = path_grid_dimensions['cols']
+                        agent_location = obs[:2]
                         agent = agents[0]
                         next_node = np.clip(
                             agent_location + agent_direction, 0, size - 1
                         )
 
-                        debug_print(next_node)
-                        target_x = next_node[0] * cell['width'] + cell['width'] / 2
-                        target_y = next_node[1] * cell['height'] + cell['height'] / 2
-
+                        target_x = next_node[0] * cell['width'] + cell['width']/2
+                        target_y = next_node[1] * cell['height'] + cell['height']/2
                         # Calculate the direction vector from the agent's current position to the target cell's position
                         delta_x = target_x - (agent['topLeftX'] + agent['width'] / 2)
                         delta_y = target_y - (agent['topLeftY'] + agent['height'] / 2)
@@ -162,14 +167,18 @@ for line in sys.stdin:
                         normalized_step_y = delta_y / distance if distance != 0 else 0
                         agent['topLeftX'] += normalized_step_x * agent['speed'] * 5
                         agent['topLeftY'] += normalized_step_y * agent['speed'] * 5
+                        # agent['topLeftX'] = target_x
+                        # agent['topLeftY'] = target_y
+
+
 
 
                     last_execution_time = current_time
 
-                debug_print(targets[0])
+                # debug_print(targets[0])
 
 
-
+            # debug_print(agents[0]['topLeftX'],agents[0]['topLeftY'])
             print(json.dumps(agents), flush=True)  # Ensure it's flushed to stdout
 
 

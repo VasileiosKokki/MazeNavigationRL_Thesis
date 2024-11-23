@@ -18,6 +18,7 @@ import {
 } from './functions.js';
 import { router } from './routes.js'
 import { spawn } from 'child_process';
+import * as fs from "fs";
 
 const pythonProcess = spawn('python', ['./python/main.py']);
 
@@ -168,13 +169,64 @@ const secretKey = "fd867a587aa02407952a83e59675e99e4c8de5bb6640db609eb8e7fdfb358
 
 
 
-const gameBoundsDimensions = {width:5000,height:5000};  // gamebounds
-const spatialGridDimensions = {rows:20,cols:20}
-const pathGridDimensions = {rows:20,cols:20}
+const gameBoundsDimensions = {width:3750,height:3750};  // gamebounds
+const spatialGridDimensions = {rows:15,cols:15}
+const pathGridDimensions = {rows:15,cols:15}
 
 
 
-const unwalkableCells = generateRandomWalls(0);
+// const unwalkableCells = generateRandomWalls(0);
+// const unwalkableCells = [
+// 	[6,5], [5,2], [5,0], [6,2], [4, 0], [4, 9], [5, 1], [2, 2], [0, 14],
+// 	[11, 14], [15, 5], [1, 15], [18, 10], [4, 2], [5, 3], [8, 2], [14, 15],
+// 	[17, 14], [11, 7], [2, 4], [13, 1], [15, 7], [6, 4], [5, 5], [5, 14],
+// 	[9, 12], [15, 0], [6, 6], [7, 5], [17, 9], [1, 3], [13, 5], [1, 12],
+// 	[15, 11], [7, 7], [18, 16], [14, 3], [17, 2], [14, 12], [11, 4], [9, 16],
+// 	[13, 7], [15, 4], [6, 1], [18, 0], [13, 16], [15, 13], [2, 13], [18, 18],
+// 	[12, 17], [10, 1], [7, 2], [13, 18], [11, 18], [16, 14], [7, 11], [18, 11],
+// 	[3, 16], [1, 0], [1, 9], [11, 11], [16, 16], [6, 17], [18, 8], [4, 17],
+// 	[8, 8], [13, 4], [8, 17], [11, 13], [2, 10], [0, 13], [3, 2], [3, 11],
+// 	[4, 10], [17, 13], [10, 7], [1, 4], [1, 13], [6, 3], [3, 4], [10, 0],
+// 	[8, 12], [15, 8], [18, 13], [10, 2], [10, 11], [2, 16], [15, 10], [18, 15],
+// 	[4, 16], [17, 10], [11, 3], [10, 13], [9, 15], [0, 12], [2, 9], [2, 18],
+// 	[6, 0], [15, 12], [7, 8]
+// ].map(([x, y]) => [x, y, x, y]);
+
+// const unwalkableCells = [
+// 	[0, 2], [9, 2],
+// 	[1, 2], [1, 3], [1, 5], [1, 6],
+// 	[2, 1], [2, 3], [2, 6], [2, 8],
+// 	[3, 1], [3, 8],
+// 	[4, 3], [4, 5], [4, 6],
+// 	[5, 1], [5, 3], [5, 6], [5, 8],
+// 	[6, 2], [6, 3], [6, 5], [6, 7],
+// 	[7, 4],
+// 	[8, 2], [8, 3], [8, 6], [8, 7]
+// ].map(([x, y]) => [x, y, x, y]);
+
+let unwalkableCells;
+
+try {
+	// Read the file asynchronously
+	const data = fs.readFileSync('obstacles.json', 'utf8');
+
+	// Parse the JSON data
+	unwalkableCells = JSON.parse(data);
+
+	// Convert arrays (if necessary) into tuples (arrays of length 2)
+	unwalkableCells = unwalkableCells.map(([x, y]) => [x, y, x, y]);  // If items are in array format like [1, 1], [2, 2]
+
+	console.log(unwalkableCells); // Display obstacles
+
+} catch (error) {
+	if (error.code === 'ENOENT') {
+		console.log("The file 'obstacles.json' does not exist.");
+	} else if (error instanceof SyntaxError) {
+		console.log("Error: The file 'obstacles.json' contains invalid JSON.");
+	} else {
+		console.error("An unexpected error occurred:", error);
+	}
+}
 
 const unwalkableCellsExpanded = unwalkableCells.flatMap(([xStart, yStart, xEnd, yEnd]) =>
 	range(xStart, yStart, xEnd, yEnd)

@@ -1,4 +1,5 @@
 import copy
+import json
 import sys
 from enum import Enum
 import gymnasium as gym
@@ -18,30 +19,38 @@ class Actions(Enum):
     up = 1
     left = 2
     down = 3
-    still = 4
+    # still = 4
 
 class GridWorldEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 60}
 
-    def __init__(self, render_mode=None, size=20):
+    def __init__(self, render_mode=None, size=15):
         self.size = size  # The size of the square grid
         self.window_size = 512  # The size of the PyGame window
         self._agent_location = None
         self._target_location = None
-        # self.grid = Grid(matrix=[[1 for _ in range(size)] for _ in range(size)])
+        matrix = [[1 for _ in range(size)] for _ in range(size)]
+        self.grid = Grid(matrix=matrix)
 
         # Observations are dictionaries with the agent's and the target's location.
         # Each location is encoded as an element of {0, ..., `size`}^2,
         # i.e. MultiDiscrete([size, size]).
-        self.observation_space = gym.spaces.Dict(
-            {
-                "agent": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),
-                "target": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),
-            }
-        )
+        try:
+            with open("obstacles.json", "r") as file:
+                obstacles = json.load(file)
+                obstacles = list(map(tuple, obstacles))
+        except FileNotFoundError:
+            print("The file 'obstacles.json' does not exist.")
+        except json.JSONDecodeError:
+            print("Error: The file 'obstacles.json' contains invalid JSON.")
+        self.obstacles = obstacles
+        # for obstacle in obstacles:
+        #     self.grid.node(obstacle[0], obstacle[1]).walkable = False
+
+        self.observation_space = spaces.MultiDiscrete([size, size, size, size])
 
         # We have 4 actions, corresponding to "right", "up", "left", "down", "right"
-        self.action_space = spaces.Discrete(5)
+        self.action_space = spaces.Discrete(4)
 
         """
         The following dictionary maps abstract actions from `self.action_space` to 
@@ -50,10 +59,10 @@ class GridWorldEnv(gym.Env):
         """
         self._action_to_direction = {
             Actions.right.value: np.array([1, 0]),
-            Actions.up.value: np.array([0, 1]),
+            Actions.up.value: np.array([0, -1]),
             Actions.left.value: np.array([-1, 0]),
-            Actions.down.value: np.array([0, -1]),
-            Actions.still.value: np.array([0, 0]),
+            Actions.down.value: np.array([0, 1]),
+            # Actions.still.value: np.array([0, 0]),
         }
 
         # self.obstacles = self._generate_obstacles()
@@ -82,7 +91,8 @@ class GridWorldEnv(gym.Env):
     #     return obstacles
 
     def _get_obs(self):
-        return {"agent": self._agent_location, "target": self._target_location}
+        result = np.concatenate([self._agent_location, self._target_location])
+        return result
 
 
     def _get_info(self):
@@ -94,16 +104,45 @@ class GridWorldEnv(gym.Env):
 
     def get_action_direction(self, action):
         return self._action_to_direction[action]
-    def updateDrawables(self, agent, target):
-        self._agent_location = np.array([agent['cellX'], agent['cellY']], dtype=int)
-        self._target_location = np.array([target['cellX'], target['cellY']], dtype=int)
+    def updateDrawables(self, agent=None, target=None):
+        if agent is not None:
+            self._agent_location = np.array([agent['cellX'], agent['cellY']], dtype=int)
+        if target is not None:
+            self._target_location = np.array([target['cellX'], target['cellY']], dtype=int)
 
-    def reset(self, agent, target, seed=None, options=None):
+
+    def action_masks(self) -> np.ndarray:
+        # Initialize action mask (0: invalid, 1: valid) for 5 actions
+        action_mask = [1] * 4
+
+        # Get agent's current position
+        x, y = self._agent_location
+
+        # Check boundaries and obstacles for each action
+        if y == 0 or (x, y - 1) in self.obstacles:  # Up
+            action_mask[Actions.up.value] = 0
+        if y == self.size - 1 or (x, y + 1) in self.obstacles:  # Down
+            action_mask[Actions.down.value] = 0
+        if x == 0 or (x - 1, y) in self.obstacles:  # Left
+            action_mask[Actions.left.value] = 0
+        if x == self.size - 1 or (x + 1, y) in self.obstacles:  # Right
+            action_mask[Actions.right.value] = 0
+
+        # print(action_mask)
+
+        # The Still action is always valid
+        # action_mask[Actions.still.value] = True
+
+        # Return the info dictionary with the action mask
+        action_mask = np.array(action_mask)
+        return action_mask
+
+    def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
-        super().reset(agent=agent, target=target, seed=seed)
+        super().reset(seed=seed)
 
-        self._agent_location = np.array([agent['cellX'], agent['cellY']], dtype=int)
-        self._target_location = np.array([target['cellX'], target['cellY']], dtype=int)
+        # self._agent_location = np.array([agent['cellX'], agent['cellY']], dtype=int)
+        # self._target_location = np.array([target['cellX'], target['cellY']], dtype=int)
 
         # self.obstacles = self._generate_obstacles()
         # for x, y in self.obstacles:
@@ -144,23 +183,24 @@ class GridWorldEnv(gym.Env):
         #debug_print('operations:', runs, 'path:', path_coordinates)
 
 
-        distanceBefore = np.linalg.norm(
-            self._agent_location - self._target_location, ord=1
-        )
-
-        direction = self._action_to_direction[action]
-        new_agent_location = np.clip(
-            self._agent_location + direction, 0, self.size - 1
-        )
-        # if tuple(new_agent_location) not in self.obstacles:
-        #     self._agent_location = new_agent_location
-        # self._agent_location = new_agent_location
-
-        distanceAfter = np.linalg.norm(
-            new_agent_location - self._target_location, ord=1
-        )
-
+        # distanceBefore = np.linalg.norm(
+        #     self._agent_location - self._target_location, ord=1
+        # )
         terminated = np.array_equal(self._agent_location, self._target_location)
+        # if not terminated:
+        #     direction = self._action_to_direction[action]
+        #     new_agent_location = np.clip(
+        #         self._agent_location + direction, 0, self.size - 1
+        #     )
+        #     # if tuple(new_agent_location) not in self.obstacles:
+        #     #     self._agent_location = new_agent_location
+        #     self._agent_location = new_agent_location
+
+        # distanceAfter = np.linalg.norm(
+        #     new_agent_location - self._target_location, ord=1
+        # )
+
+        # terminated = np.array_equal(self._agent_location, self._target_location)
 
 
 
@@ -170,7 +210,7 @@ class GridWorldEnv(gym.Env):
             reward = 100
             debug_print(reward)
         else:
-            reward = (distanceBefore - distanceAfter)
+            reward = 0
             # if tuple(new_agent_location) in self.obstacles: || distanceBefore == distanceAfter:
             #     reward = -1
             # if len(path_coordinates) > 1 and tuple(self._agent_location) == path_coordinates[1]:
@@ -209,15 +249,15 @@ class GridWorldEnv(gym.Env):
 
         # Draw obstacles
         pix_square_size = self.window_size / self.size
-        # for obstacle in self.obstacles:
-        #     pygame.draw.rect(
-        #         canvas,
-        #         (128, 128, 128),  # Gray color for obstacles
-        #         pygame.Rect(
-        #             pix_square_size * np.array(obstacle),
-        #             (pix_square_size, pix_square_size),
-        #             ),
-        #     )
+        for obstacle in self.obstacles:
+            pygame.draw.rect(
+                canvas,
+                (128, 128, 128),  # Gray color for obstacles
+                pygame.Rect(
+                    pix_square_size * np.array(obstacle),
+                    (pix_square_size, pix_square_size),
+                    ),
+            )
 
         # First we draw the target
         pygame.draw.rect(
