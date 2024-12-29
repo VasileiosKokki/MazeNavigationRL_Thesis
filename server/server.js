@@ -20,7 +20,7 @@ import { router } from './routes.js'
 import { spawn } from 'child_process';
 import * as fs from "fs";
 
-const pythonProcess = spawn('python', ['./python/main.py']);
+const pythonProcess = spawn('python', ['./python/main_petting.py']);
 
 const limiter = rateLimit({
 	windowMs: 1 * 60 * 1000, // 1 minute
@@ -212,11 +212,12 @@ try {
 
 	// Parse the JSON data
 	unwalkableCells = JSON.parse(data);
+	unwalkableCells = [[3,4]];
 
 	// Convert arrays (if necessary) into tuples (arrays of length 2)
 	unwalkableCells = unwalkableCells.map(([x, y]) => [x, y, x, y]);  // If items are in array format like [1, 1], [2, 2]
 
-	console.log(unwalkableCells); // Display obstacles
+	// console.log(unwalkableCells); // Display obstacles
 
 } catch (error) {
 	if (error.code === 'ENOENT') {
@@ -275,7 +276,7 @@ sendOneTimeDataToPython(gameBoundsDimensions, pathGridDimensions, unwalkableCell
 for (let i = 0; i < 100; i++){     // up to 10000 lagless without shooting
 	clientCounter = createFood(clientCounter, drawables, gameBoundsDimensions);
 }
-for (let i = 0; i < 1; i++) {
+for (let i = 0; i < 2; i++) {
 	clientCounter = createAgent(clientCounter, drawables, gameBoundsDimensions);
 }
 

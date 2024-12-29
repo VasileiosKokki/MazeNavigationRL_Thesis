@@ -352,7 +352,7 @@ def test_sb3(render=True):
     #env = gym.make('FrozenLake-v1', render_mode="human", is_slippery=False, map_name="8x8")
 
     # Load model
-    model = MaskablePPO.load('models/MaskablePPO_837288', env=env)
+    model = MaskablePPO.load('models/MaskablePPO_837288', env=env, device='cpu')
 
     # Run a test
     for _ in range(20):

@@ -24,10 +24,10 @@ from gymnasium.wrappers import TimeLimit
 from tqdm import tqdm
 
 
-# try:
-#     pydevd_pycharm.settrace('localhost', port=5678, stderrToServer=True, suspend=False)
-# except ConnectionRefusedError:
-#     pass
+try:
+    pydevd_pycharm.settrace('localhost', port=5678, stderrToServer=True, suspend=False)
+except ConnectionRefusedError:
+    pass
 
 cell = None
 path_grid_dimensions = None
@@ -47,7 +47,7 @@ def debug_print(*args):
     print(" | ".join(map(str, args)), file=sys.stderr)
 
 
-def test_sb3(render=True):
+def eval_sb3(render=True):
 
     env = gym.make('gymnasium_env/GridWorld-v0', render_mode="human")
     #env = gym.make('FrozenLake-v1', render_mode="human", is_slippery=False, map_name="8x8")
@@ -75,8 +75,8 @@ def test_sb3(render=True):
 
     env.close()
 
-if agents is not None:
-    test_sb3()
+# if agents is not None:
+#     eval_sb3()
 test_sb3_called = False
 for line in sys.stdin:
     try:

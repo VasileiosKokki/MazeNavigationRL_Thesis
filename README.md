@@ -1,29 +1,33 @@
-# Tankio
-An MVC (Thin-Client) Model Multiplayer Game.
+# Gymnasium Examples
+Some simple examples of Gymnasium environments and wrappers.
+For some explanations of these examples, see the [Gymnasium documentation](https://gymnasium.farama.org).
 
-In this setup, a server is responsible for managing connections from clients and handling user actions by continuously updating the game's model. The model represents the game world, with each player represented as a square that can move around. The server calculates the state of this model.
+### Environments
+This repository hosts the examples that are shown [on the environment creation documentation](https://gymnasium.farama.org/tutorials/gymnasium_basics/environment_creation/).
+- `GridWorldEnv`: Simplistic implementation of gridworld environment
 
-On the client side, the game continuously receives updates about the model's state as an array of arrays every 40 milliseconds. It then uses this data to render the game world on an HTML canvas.
+### Wrappers
+This repository hosts the examples that are shown [on wrapper documentation](https://gymnasium.farama.org/api/wrappers/).
+- `ClipReward`: A `RewardWrapper` that clips immediate rewards to a valid range
+- `DiscreteActions`: An `ActionWrapper` that restricts the action space to a finite subset
+- `RelativePosition`: An `ObservationWrapper` that computes the relative position between an agent and a target
+- `ReacherRewardWrapper`: Allow us to weight the reward terms for the reacher environment
 
-Installation Instructions
-To get started, follow these steps:
+### Contributing
+If you would like to contribute, follow these steps:
+- Fork this repository
+- Clone your fork
+- Set up pre-commit via `pre-commit install`
 
-Clone or download the project files.
+PRs may require accompanying PRs in [the documentation repo](https://github.com/Farama-Foundation/Gymnasium/tree/main/docs).
 
-Open your terminal and navigate to the project directory.
 
-Run the following command to install the necessary npm modules:
-npm install
+## Installation
 
-Running the Game
-To run the game, execute one of the following commands:
+To install your new environment, run the following commands:
 
-Using npm:
-npm start
+```{shell}
+cd petting_env
+pip install -e .
+```
 
-Using Node.js:
-node server.js
-
-After starting the server, you can access the client at http://localhost:3000/client.html.
-
-Please note that the server is set to listen on port 3000, and the client's WebSocket connection request is configured to connect to "localhost." Ensure that you adjust these settings as needed to match your specific environment or deployment.

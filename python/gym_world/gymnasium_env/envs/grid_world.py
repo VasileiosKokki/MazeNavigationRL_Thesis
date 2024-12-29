@@ -129,12 +129,12 @@ class MazeGenerator:
 
     def get_maze_grid(self):
         temp_board = copy.deepcopy(self.board)
-        for y in range(self.height):
-            for x in range(self.width):
-                if temp_board[y][x] == 2:
-                    temp_board[y][x] = 0
-                if temp_board[y][x] == 3:
-                    temp_board[y][x] = 0
+        # for y in range(self.height):
+        #     for x in range(self.width):
+        #         if temp_board[y][x] == 2:
+        #             temp_board[y][x] = 0
+        #         if temp_board[y][x] == 3:
+        #             temp_board[y][x] = 0
         return temp_board
 
 def astar(grid_size, start, target, obstacles):
@@ -345,7 +345,18 @@ class GridWorldEnv(gym.Env):
         # result = np.array(self.maze)
         # print(np.vstack(self.maze))
         # result = np.vstack(self.maze)
-        result = np.expand_dims(self.maze, axis=-1)
+
+        self.board = list(np.zeros((self.size, self.size), dtype=int))
+        for obstacle in self.obstacles:
+            self.board[obstacle[0]][obstacle[1]] = 1
+        if self.board[self._agent_location[0]][self._agent_location[1]] == 0:
+            self.board[self._agent_location[0]][self._agent_location[1]] = 2
+
+        if self.board[self._target_location[0]][self._target_location[1]] == 0:
+            self.board[self._target_location[0]][self._target_location[1]] = 3
+
+        print(np.array(self.board))
+        result = np.expand_dims(np.array(self.board, dtype="uint8"), axis=-1)
         # print(result)
         # print("Observation:", result)
         # print("Observation Space:", self.observation_space)
@@ -483,7 +494,7 @@ class GridWorldEnv(gym.Env):
         # self._target_location = np.array([3, 6])
         #
         # for _ in range(4):
-        #     target_action = self.action_space.sample()
+        target_action = self.action_space.sample()
         #     target_direction = self._action_to_direction[target_action]
         #     new_target_location = np.clip(
         #         self._target_location + target_direction, 0, self.size - 1
