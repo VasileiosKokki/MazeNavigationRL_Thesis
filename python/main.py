@@ -120,7 +120,7 @@ for line in sys.stdin:
                 #env = gym.make('FrozenLake-v1', render_mode="human", is_slippery=False, map_name="8x8")
 
                 # Load model
-                model = MaskablePPO.load('models/MaskablePPO_4014096', env=env)
+                model = PPO.load('models/PPO_53dbb52a84d944dfafe0f3f504537dba_200720.zip', env=env)
 
                 # obs, info = env.reset()
                 env.unwrapped.updateDrawables(agent=agents[0], target=targets[0])
