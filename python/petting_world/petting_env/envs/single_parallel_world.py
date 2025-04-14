@@ -11,7 +11,7 @@ from gymnasium import spaces
 from gymnasium.spaces import Box, Discrete, Dict, Tuple
 from gymnasium.utils import seeding
 from pettingzoo.utils import agent_selector
-from pettingzoo import AECEnv
+from pettingzoo import AECEnv, ParallelEnv
 from pettingzoo.utils.env import ActionType, AgentID
 
 
@@ -21,11 +21,10 @@ class Actions(Enum):
     left = 0
     down = 3
 
-class CustomActionMaskedEnvironment(AECEnv):
+class CustomActionMaskedEnvironment(ParallelEnv):
     metadata = {
         "name": "custom_environment_aec_v0",
         "render_fps": 1,
-        "is_parallelizable": True
     }
 
     def __init__(self, render_mode=None, size=10):
@@ -37,7 +36,7 @@ class CustomActionMaskedEnvironment(AECEnv):
         self.guard2_location = None
         self.prisoner_location = None
         self.timestep = None
-        self.possible_agents = ["guard1", "guard2"]
+        self.possible_agents = ["guard1"]
         self.render_mode = render_mode
         self.window = None
         self.clock = None
@@ -53,6 +52,7 @@ class CustomActionMaskedEnvironment(AECEnv):
 
         self._agent_selector = agent_selector(self.possible_agents)
         self.agent_selection = None
+        self.dones = {agent: False for agent in self.possible_agents}
         self.terminations = {agent: False for agent in self.possible_agents}
         self.truncations = {agent: False for agent in self.possible_agents}
         self.rewards = {agent: 0 for agent in self.possible_agents}
@@ -66,8 +66,7 @@ class CustomActionMaskedEnvironment(AECEnv):
         }
 
     def reset(self, seed=None, options=None):
-        if seed is not None:
-            self.np_random, self.np_random_seed = seeding.np_random(seed)
+        self.np_random, self.np_random_seed = seeding.np_random(seed)
 
 
         self.agents = copy(self.possible_agents)
@@ -99,50 +98,23 @@ class CustomActionMaskedEnvironment(AECEnv):
         #     if not np.array_equal(self.escape_location, self.prisoner_location) and not np.array_equal(self.escape_location, self.guard1_location):
         #         break
 
-        self.infos = {a: {} for a in self.agents}
+        observations = self.get_all_obs()
 
-    def step(self, action: Optional[ActionType]):
-        if (
-                self.terminations[self.agent_selection]
-                or self.truncations[self.agent_selection]
-        ):
-            del self._actions[self.agent_selection]
-            assert action is None
-            self._was_dead_step(action)
-            return
+        # Get dummy infos. Necessary for proper parallel_to_aec conversion
+        infos = {a: {} for a in self.agents}
 
-        self._actions[self.agent_selection] = action
-        if self._agent_selector.is_last():
-            obss, rews, terminations, truncations, infos = self.step_all(self._actions)
+        if self.render_mode == "human":
+            self.render()
 
-            self._observations = copy(obss)
-            self.terminations = copy(terminations)
-            self.truncations = copy(truncations)
-            self.infos = copy(infos)
-            self.rewards = copy(rews)
-            self._cumulative_rewards = copy(rews)
+        return observations, infos
 
-            env_agent_set = set(self.agents)
-
-            self.agents = self.agents + [
-                agent
-                for agent in sorted(self._observations.keys(), key=lambda x: str(x))
-                if agent not in env_agent_set
-            ]
-
-            if len(self.agents):
-                self._agent_selector = agent_selector(self.agents)
-                self.agent_selection = self._agent_selector.reset()
-
-            self._deads_step_first()
-        else:
-            if self._agent_selector.is_first():
-                self._clear_rewards()
-
-            self.agent_selection = self._agent_selector.next()
-
-    def step_all(self, actions):
-        print(actions)
+    def step(self, actions):
+        previously_done = [
+            agent for agent in self.agents
+            if self.terminations.get(agent, False) or self.truncations.get(agent, False)
+               and agent != self.agent_selection  # Don't remove current agent yet
+        ]
+        # print(actions)
         if "guard1" in actions :
             guard1_action = actions["guard1"]
         else:
@@ -172,7 +144,7 @@ class CustomActionMaskedEnvironment(AECEnv):
         #             print("no space")
         #             break
 
-
+        # print(actions)
         # prisoner_action = self.action_space("guard1").sample()
         # prisoner_direction = self._action_to_direction[prisoner_action]
         # new_prisoner_location = np.clip(
@@ -196,8 +168,8 @@ class CustomActionMaskedEnvironment(AECEnv):
         else:
             new_guard2_location = self.guard2_location
 
-        guard1_reward = 0
-        guard2_reward = 0
+        # guard1_reward = 0
+        # guard2_reward = 0
 
 
         # self.prisoner_location = new_prisoner_location
@@ -209,38 +181,40 @@ class CustomActionMaskedEnvironment(AECEnv):
         # new_distance2 = abs(new_guard2_location[0] - self.prisoner_location[0]) + abs(new_guard2_location[1] - self.prisoner_location[1])
         path = self.astar(tuple(self.guard1_location), tuple(self.prisoner_location))
         distance1 = len(path)
-        path = self.astar(tuple(self.guard2_location), tuple(self.prisoner_location))
-        distance2 = len(path)
+        # path = self.astar(tuple(self.guard2_location), tuple(self.prisoner_location))
+        # distance2 = len(path)
 
         new_path = self.astar(tuple(new_guard1_location), tuple(self.prisoner_location))
         new_distance1 = len(new_path)
-        new_path = self.astar(tuple(new_guard2_location), tuple(self.prisoner_location))
-        new_distance2 = len(new_path)
+        # new_path = self.astar(tuple(new_guard2_location), tuple(self.prisoner_location))
+        # new_distance2 = len(new_path)
 
         if new_distance1 < distance1:
-            guard1_reward += 0.05
+            guard1_reward = 1 / 100
+        elif new_distance1 > distance1:
+            guard1_reward = -2 / 100
         else:
-            guard1_reward -= 0.1
+            guard1_reward = -1 / 100
 
-        if new_distance2 < distance2:
-            guard2_reward += 0.05
-        else:
-            guard2_reward -= 0.1
+        # if new_distance2 < distance2:
+        #     guard2_reward += 0.05
+        # else:
+        #     guard2_reward -= 0.1
 
-        if np.array_equal(new_guard1_location, new_guard2_location):
-            guard1_reward -= 0.05
-            guard2_reward -= 0.05
+        # if np.array_equal(new_guard1_location, new_guard2_location):
+        #     guard1_reward -= 0.05
+        #     guard2_reward -= 0.05
 
 
         # terminations = {a: False for a in self.agents}
         to_terminate1 = False
-        to_terminate2 = False
-        if np.array_equal(new_prisoner_location, new_guard1_location) or np.array_equal(new_prisoner_location, new_guard2_location):
+        # to_terminate2 = False
+        if np.array_equal(new_prisoner_location, new_guard1_location):
             guard1_reward = 1
-            guard2_reward = 1
+            # guard2_reward = 1
             # terminations = {a: True for a in self.agents}
             to_terminate1 = True
-            to_terminate2 = True
+            # to_terminate2 = True
         # elif np.array_equal(self.prisoner_location, self.escape_location):
         #     prisoner_reward = 1
         #     guard1_reward = -1
@@ -248,22 +222,30 @@ class CustomActionMaskedEnvironment(AECEnv):
         if tuple(new_guard1_location) in self.obstacles:
             guard1_reward = 0
             to_terminate1 = True
+            # self._agent_selector.reinit(["guard_2"])
 
-        if tuple(new_guard2_location) in self.obstacles:
-            guard2_reward = 0
-            to_terminate2 = True
+        # if tuple(new_guard2_location) in self.obstacles:
+        #     guard2_reward = 0
+        #     to_terminate2 = True
+        #     # self._agent_selector.reinit(["guard_1"])
 
-        terminations = {"guard1": to_terminate1, "guard2": to_terminate2}
+        # terminations = {"guard1": to_terminate1, "guard2": to_terminate2}
+        terminations = {}
+        for agent in self.agents:
+            terminations[agent] = to_terminate1 if agent == "guard1" else to_terminate2
 
         # Check truncation conditions (overwrites termination conditions)
         truncations = {a: False for a in self.agents}
         if self.timestep > 100:
             guard1_reward = -1
-            guard2_reward = -1
-            truncations = {"guard1": True, "guard2": True}
+            # guard2_reward = -1
+            truncations = {a: True for a in self.agents}
         self.timestep += 1
 
-        rewards = {"guard1": guard1_reward, "guard2": guard2_reward}
+        # rewards = {"guard1": guard1_reward, "guard2": guard2_reward}
+        rewards = {}
+        for agent in self.agents:
+            rewards[agent] = guard1_reward if agent == "guard1" else guard2_reward
         # Get observations
         observations = self.get_all_obs()
 
@@ -281,14 +263,35 @@ class CustomActionMaskedEnvironment(AECEnv):
         # if any(terminations.values()) or all(truncations.values()):
         #     self.agents = []
 
-        # for agent in list(self.agents):
-        #     if terminations.get(agent, False) or truncations.get(agent, False):
-        #         self.agents.remove(agent)
-        #         print(self.agents)
+        # done_agents = [agent for agent in self.agents
+        #                if terminations.get(agent, False) or truncations.get(agent, False)]
+        # self.agents = [agent for agent in self.agents if agent not in done_agents]
+        # self.agents = [a for a in self.agents if a not in previously_done]
+        self.truncations = truncations
+        self.terminations = terminations
+
+        self.agents = [
+            agent
+            for agent in self.agents
+            if not (terminations[agent] or truncations[agent])
+        ]
+
+
+        # Also remove them from all relevant dictionaries
+        # for agent in previously_done:
+        #     terminations.pop(agent, None)
+        #     truncations.pop(agent, None)
+        #     rewards.pop(agent, None)
+        #     observations.pop(agent, None)
+        #     infos.pop(agent, None)
+
+        # print("Remaining agents:", self.agents)
+        # print(rewards)
+
 
         self.prisoner_location = new_prisoner_location
         self.guard1_location = new_guard1_location
-        self.guard2_location = new_guard2_location
+        # self.guard2_location = new_guard2_location
 
         if self.render_mode == "human":
             self.render()
@@ -406,28 +409,30 @@ class CustomActionMaskedEnvironment(AECEnv):
 
             self.guard1_location = np.array((agent_x, agent_y))
 
-            while True:
-                agent_x = self.np_random.integers(1, self.width - 1)
-                agent_y = self.np_random.integers(1, self.height - 1)
-                if (agent_x, agent_y) not in self.obstacles and (agent_x, agent_y) != tuple(self.guard1_location):
-                    break
+            # while True:
+            #     agent_x = self.np_random.integers(1, self.width - 1)
+            #     agent_y = self.np_random.integers(1, self.height - 1)
+            #     if (agent_x, agent_y) not in self.obstacles and (agent_x, agent_y) != tuple(self.guard1_location):
+            #         break
+            #
+            # self.guard2_location = np.array((agent_x, agent_y))
 
-            self.guard2_location = np.array((agent_x, agent_y))
+            # print(self.obstacles)
+            # print("-----",self.guard2_location,"===\n")
 
             # Generate a random position for the goal
             while True:
                 goal_x = self.np_random.integers(1, self.width - 1)
                 goal_y = self.np_random.integers(1, self.height - 1)
-                if (goal_x, goal_y) not in self.obstacles and (goal_x, goal_y) != tuple(self.guard1_location) and (goal_x, goal_y) != tuple(self.guard2_location):
+                if (goal_x, goal_y) not in self.obstacles and (goal_x, goal_y) != tuple(self.guard1_location):
                     break
 
             self.prisoner_location = np.array((goal_x, goal_y))
 
             path1 = self.astar(tuple(self.guard1_location), tuple(self.prisoner_location))
-            path2 = self.astar(tuple(self.guard2_location), tuple(self.prisoner_location))
             # print(path1)
             # print(path2)
-            if path1 != None and path2 != None:
+            if path1 != None:
                 break
 
 
@@ -477,8 +482,8 @@ class CustomActionMaskedEnvironment(AECEnv):
         maze[y, x] = 2
         x, y = self.guard1_location
         maze[y, x] = 3
-        x, y = self.guard2_location
-        maze[y, x] = 4
+        # x, y = self.guard2_location
+        # maze[y, x] = 4
 
         return maze
 
@@ -503,22 +508,27 @@ class CustomActionMaskedEnvironment(AECEnv):
         view = np.array(view, dtype="uint8")
         view = np.expand_dims(view, axis=-1)
 
-        # Get the current player's specific view (second channel)
-        current_player_view = self.get_current_player_maze(agent)
-        current_player_view = np.array(current_player_view, dtype="uint8")
-        current_player_view = np.expand_dims(current_player_view, axis=-1)  # Adding a channel dimension (shape: (size, size, 1))
+        # # Get the current player's specific view (second channel)
+        # current_player_view = self.get_current_player_maze(agent)
+        # current_player_view = np.array(current_player_view, dtype="uint8")
+        # current_player_view = np.expand_dims(current_player_view, axis=-1)  # Adding a channel dimension (shape: (size, size, 1))
+        #
+        # # Stack the two channels together (shape: (size, size, 2))
+        # combined_view = np.concatenate([view, current_player_view], axis=-1)
 
-        # Stack the two channels together (shape: (size, size, 2))
-        combined_view = np.concatenate([view, current_player_view], axis=-1)
-
-        return combined_view
+        return view
 
 
     def get_all_obs(self):
-        observation = {
-            "guard1": self.get_obs("guard1"),
-            "guard2": self.get_obs("guard2"),
-        }
+        # observation = {
+        #     "guard1": self.get_obs("guard1"),
+        #     "guard2": self.get_obs("guard2"),
+        # }
+        observation = {}
+        if "guard1" in self.agents:
+            observation["guard1"] = self.get_obs("guard1")
+        if "guard2" in self.agents:
+            observation["guard2"] = self.get_obs("guard2")
         # print(observation)
 
         return observation
@@ -572,12 +582,12 @@ class CustomActionMaskedEnvironment(AECEnv):
             (self.guard1_location + 0.5) * pix_square_size,
             pix_square_size / 3,
             )
-        pygame.draw.circle(
-            canvas,
-            (0, 0, 200),
-            (self.guard2_location + 0.5) * pix_square_size,
-            pix_square_size / 3,
-            )
+        # pygame.draw.circle(
+        #     canvas,
+        #     (0, 0, 200),
+        #     (self.guard2_location + 0.5) * pix_square_size,
+        #     pix_square_size / 3,
+        #     )
 
         # Finally, add some gridlines
         for x in range(self.size + 1):
@@ -628,7 +638,7 @@ class CustomActionMaskedEnvironment(AECEnv):
             low=0,
             high=255,
             # shape=(total_view_size, total_view_size, 1),
-            shape=(self.size, self.size, 2),
+            shape=(self.size, self.size, 1),
             # shape=(self.size, self.size),
             dtype="uint8",
         )

@@ -133,6 +133,9 @@ class CustomActionMaskedEnvironment(ParallelEnv):
         # Execute actions
         # agent = self.agent_selection
         # is_last = self._agent_selector.is_last()
+        if not actions:
+            self.agents = []
+            return {}, {}, {}, {}, {}
 
         # print(actions)
         if "prisoner" in actions and "guard" in actions:
