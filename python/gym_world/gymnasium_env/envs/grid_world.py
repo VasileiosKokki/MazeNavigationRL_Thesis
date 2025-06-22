@@ -29,68 +29,55 @@ class Actions(Enum):
     up = 1
     left = 2
     down = 3
-    # still = 4
 
 class GridWorldEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, size=10):
+    def __init__(self, render_mode=None, size=10, num_obstacles=15, num_patterns=10, moving_target=False, dense_rewards=True, policy="CnnPolicy"):
         self.size = size  # The size of the square grid
-        # self.window_size = 512 # The size of the PyGame window
         self.window_size = 512 # The size of the PyGame window
-        # matrix = [[1 for _ in range(size)] for _ in range(size)]
-        # self.grid = Grid(matrix=matrix)
+        self.policy = policy
         self._agent_location = None
         self._target_location = None
+        self.moving_target = moving_target
+        self.dense_rewards = dense_rewards
         self.obstacle_index = 0
-        self.num_obstacles = 15
-        self.num_patterns = 10
+        self.num_obstacles = num_obstacles
+        self.num_patterns = num_patterns
         self.width = size
         self.height = size
         self.max_steps = 100
-        self.reward_range = (0, 1)
+        self.reward_range = (-1, 1)
 
-        # try:
-        #     with open("obstacles.json", "r") as file:
-        #         obstacles = json.load(file)
-        #         self.obstacles = list(map(tuple, obstacles))
-        # except FileNotFoundError:
-        #     print("The file 'obstacles.json' does not exist.")
-        # except json.JSONDecodeError:
-        #     print("Error: The file 'obstacles.json' contains invalid JSON.")
+        border_obstacle_count = 2 * self.size + 2 * (self.size - 2)  # = 4 * self.size - 4
+        num_obstacles = self.num_obstacles + border_obstacle_count
 
-        # matrix = [[1 for _ in range(self.size)] for _ in range(self.size)]
-        # self.grid = Grid(matrix=matrix)
-        # for obstacle in self.obstacles:
-        #     self.grid.node(obstacle[0], obstacle[1]).walkable = False
+        if self.policy == "CnnPolicy":
+            self.observation_space = spaces.Box(
+                low=0,
+                high=255,
+                shape=(self.size, self.size, 1),
+                dtype="uint8"
+            )
+        elif self.policy == "MultiInputPolicy":
+            self.observation_space = spaces.Dict({
+                "agent_pos": spaces.Box(low=0, high=self.size - 1, shape=(2,), dtype=np.int32),
+                "target_pos": spaces.Box(low=0, high=self.size - 1, shape=(2,), dtype=np.int32),
+                "obstacles": spaces.Box(
+                    low=0,
+                    high=self.size - 1,
+                    shape=(num_obstacles, 2),  # one (x, y) per obstacle
+                    dtype="uint8"
+                )
+            })
+        else:
+            self.observation_space = spaces.Box(
+                low=0,
+                high=self.size - 1,
+                shape=(2 + 2 + 2 * num_obstacles,),
+                dtype="uint8"
+            )
 
-
-        self.view_size = self.size // 2
-        # self.view_size = 1
-        total_view_size = self.view_size*2 + 1
-        # total_view_size = self.size + 1
-        image_observation_space = spaces.Box(
-            low=0,
-            high=255,
-            # shape=(total_view_size, total_view_size, 1),
-            shape=(self.size, self.size, 1),
-            # shape=(self.size, self.size),
-            dtype="uint8",
-        )
-        # image_observation_space = spaces.Box(
-        #     low=0,
-        #     high=255,
-        #     shape=(self.window_size, self.window_size, 3),
-        #     dtype="uint8",
-        # )
-        # self.observation_space = spaces.Dict(
-        #     {
-        #         "image": image_observation_space,
-        #         # "direction": spaces.Discrete(4),
-        #         # "mission": mission_space,
-        #     }
-        # )
-        self.observation_space = image_observation_space
 
 
 
@@ -108,10 +95,7 @@ class GridWorldEnv(gym.Env):
             Actions.up.value: np.array([0, -1]),
             Actions.left.value: np.array([-1, 0]),
             Actions.down.value: np.array([0, 1]),
-            # Actions.still.value: np.array([0, 0]),
         }
-
-        # self.obstacles = self._generate_obstacles()
 
 
 
@@ -142,21 +126,30 @@ class GridWorldEnv(gym.Env):
         #     # "grid": np.array(self.maze)
         # }
         # view = self.get_agent_view()
-        self.get_maze()
-        view = self.maze
-        view = np.array(view, dtype="uint8")
-        view = np.expand_dims(view, axis=-1)
-        # view = self._render_frame()
+        if self.policy == "CnnPolicy":
+            self.get_maze()
+            view = self.maze
+            view = np.array(view, dtype="uint8")
+            view = np.expand_dims(view, axis=-1)
+            result = view
+        elif self.policy == "MultiInputPolicy":
+            result = {
+                "agent": self._agent_location,
+                "target": self._target_location,
+                "obstacles": np.array(sorted(self.obstacles)).flatten(),
+            }
+        else:
+            result = np.concatenate([
+                np.array(self._agent_location),        # (x, y)
+                np.array(self._target_location),       # (x, y)
+                np.array(sorted(self.obstacles)).flatten(),    # [x1, y1, x2, y2, ...]
+            ])
 
-        # result = {
-        #     "image": view
-        # }
-        result = view
         # print(result)
         # print(result.shape)
         # print(f"\r{result}%", end='', flush=True)
 
-
+        result = result.astype(np.uint8)
         return result
 
     def get_maze(self):
@@ -167,38 +160,6 @@ class GridWorldEnv(gym.Env):
         self.maze[y, x] = 4
         x, y = self._agent_location
         self.maze[y, x] = 3
-
-    def get_agent_view(self):
-        agent_x, agent_y = self._agent_location
-
-        # Initialize the environment grid (1 = wall, 0 = free space)
-        # Assuming self.grid is your environment grid
-        self.get_maze()
-        grid = self.maze  # e.g., a 2D numpy array
-
-
-        # Calculate bounds for the 5x5 view
-        min_x = max(agent_x - self.view_size, 0)
-        max_x = min(agent_x + self.view_size + 1, grid.shape[0])
-        min_y = max(agent_y - self.view_size, 0)
-        max_y = min(agent_y + self.view_size + 1, grid.shape[1])
-
-        # Extract the 5x5 view
-        view = grid[min_x:max_x, min_y:max_y]
-
-        # Pad the view to ensure it's 5x5
-        pad_top = max(0, self.view_size - agent_x)
-        pad_bottom = max(0, (agent_x + self.view_size + 1) - grid.shape[0])
-        pad_left = max(0, self.view_size - agent_y)
-        pad_right = max(0, (agent_y + self.view_size + 1) - grid.shape[1])
-
-        view = np.pad(view, ((pad_top, pad_bottom), (pad_left, pad_right)), constant_values=2)  # 2 = wall for padding
-        # Set the center of the view (agent's position) to 0
-        # view[half_view, half_view] = 0
-
-        return view
-
-
 
     def _get_info(self):
         return {
@@ -257,46 +218,46 @@ class GridWorldEnv(gym.Env):
         info = self._get_info()
         # print(action)
         # info = self.valid_action_mask()
+        reward = 0
 
-        # if np.random.rand() < 0.5:
-        #     target_action = self.action_space.sample()
-        #     target_direction = self._action_to_direction[target_action]
-        #     new_target_location = np.clip(
-        #         self._target_location + target_direction, 0, self.size - 1
-        #     )
-        #     if tuple(new_target_location) not in self.obstacles:
-        #         self._target_location = new_target_location
-
-
-        path = self.astar(tuple(self._agent_location), tuple(self._target_location))
-        distanceBefore = len(path)
+        if self.dense_rewards:
+            if self.num_obstacles == 0:
+                distance = self.manhattan(tuple(self._agent_location), tuple(self._target_location))
+            else:
+                path = self.astar(tuple(self._agent_location), tuple(self._target_location))
+                distance = len(path)
 
 
-        direction = self._action_to_direction[action]
-        new_agent_location = np.clip(
-            self._agent_location + direction, 0, self.size - 1
-        )
-        # if tuple(new_agent_location) not in self.obstacles:
-        #     self._agent_location = new_agent_location
-        self._agent_location = new_agent_location
+            distanceBefore = distance
 
-        path = self.astar(tuple(self._agent_location), tuple(self._target_location))
-        distanceAfter = len(path)
+            direction = self._action_to_direction[action]
+            new_agent_location = np.clip(
+                self._agent_location + direction, 0, self.size - 1
+            )
+            self._agent_location = new_agent_location
 
-        if (distanceAfter < distanceBefore):
-            reward = 1 / 100
-        elif (distanceAfter > distanceBefore):
-            reward = -2 / 100
+            if self.num_obstacles == 0:
+                distance = self.manhattan(tuple(self._agent_location), tuple(self._target_location))
+            else:
+                path = self.astar(tuple(self._agent_location), tuple(self._target_location))
+                distance = len(path)
+
+            distanceAfter = distance
+
+            if (distanceAfter < distanceBefore):
+                reward = 1 / 100
+            elif (distanceAfter > distanceBefore):
+                reward = -2 / 100
+            else:
+                reward = -1 / 100
         else:
-            reward = -1 / 100
+            direction = self._action_to_direction[action]
+            new_agent_location = np.clip(
+                self._agent_location + direction, 0, self.size - 1
+            )
+            self._agent_location = new_agent_location
 
-        # reward = 0
-
-
-        # if tuple(new_agent_location) in self.obstacles: || distanceBefore == distanceAfter:
-        #     reward = -1
-
-        if np.array_equal(self._agent_location, self._target_location):
+        if np.array_equal(new_agent_location, self._target_location):
             terminated = True
             reward = 1 - 0.9 * (self.step_count / self.max_steps)
 
@@ -304,11 +265,6 @@ class GridWorldEnv(gym.Env):
             terminated = True
             reward = 0
 
-
-
-        # print(reward)
-
-        observation = self._get_obs()
 
         truncated = False
         if self.step_count >= self.max_steps:
@@ -318,21 +274,35 @@ class GridWorldEnv(gym.Env):
         if self.render_mode == "human":
             self._render_frame()
 
-        # print(self.step_count)
+        if self.moving_target:
+            target_action = self.action_space.sample()
+            target_direction = self._action_to_direction[target_action]
+            new_target_location = np.clip(
+                self._target_location + target_direction, 0, self.size - 1
+            )
+            self._target_location = new_target_location
+
+        observation = self._get_obs()
 
         return observation, reward, terminated, truncated, info
 
     def _gen_grid(self):
-        file_path = r"C:\Users\User\Desktop\Personal Project\tankio-master\obstacle_patterns.json"
-        # if not os.path.exists(file_path):
-        #     self.generate_pattern()
-        # #load the obstacle patterns from the file
-        with open(file_path, 'r') as f:
-            obstacle_patterns = json.load(f)
 
-        selected_pattern = obstacle_patterns[self.obstacle_index]
+        if self.num_patterns == 0:
+            selected_pattern = self.generate_pattern() # always random pattern, not cycling between 10 patterns
+        else:
+            # file_path = r"C:\Users\User\Desktop\Personal Project\tankio-master\obstacle_patterns.json"
+            file_path = 'obstacle_patterns.json'
+            if not os.path.exists(file_path):
+                self.save_patterns()
+            #load the obstacle patterns from the file
+            with open(file_path, 'r') as f:
+                obstacle_patterns = json.load(f)
+
+            selected_pattern = obstacle_patterns[self.obstacle_index]
+
         self.obstacles = set([tuple(coord) for coord in selected_pattern])
-        for i in range(self.size):
+        for i in range(self.size): # we add the borders
             self.obstacles.add((i, 0))  # Left edge
             self.obstacles.add((i, self.size - 1))  # Right edge
             self.obstacles.add((0, i))  # Top edge
@@ -359,36 +329,22 @@ class GridWorldEnv(gym.Env):
 
             self._target_location = np.array((goal_x, goal_y))
 
-            path = self.astar(tuple(self._agent_location), tuple(self._target_location))
+            if self.num_obstacles == 0:
+                path = self.manhattan(tuple(self._agent_location), tuple(self._target_location))
+            else:
+                path = self.astar(tuple(self._agent_location), tuple(self._target_location))
 
         # Update index to cycle through patterns
-        # num_patterns = len(obstacle_patterns)
-        num_patterns = 3
-        self.obstacle_index = (self.obstacle_index + 1) % num_patterns
+        if self.num_patterns != 0:
+            self.obstacle_index = (self.obstacle_index + 1) % self.num_patterns
 
 
-    def generate_pattern(self):
-        # Generate 10 random obstacle patterns and apply discard rules
+    def save_patterns(self):
+        # Generate x random obstacle patterns and apply discard rules
         obstacle_patterns = []
         for _ in range(self.num_patterns):
-            pattern = set()
-            while len(pattern) < self.num_obstacles:
-                modifier = 3
-                modifier_disc = modifier + 1
-                x = int(self.np_random.integers(modifier, self.width - modifier))
-                y = int(self.np_random.integers(modifier, self.height - modifier))
-                if (x, y) not in pattern:
-                    pattern.add((x, y))  # Ensure no duplicates
-
-                # Apply discard rules during generation
-                # for x in range(modifier_disc, self.width - modifier_disc):
-                #     pattern.discard((x, modifier_disc))  # Remove obstacles along the vertical line
-                #
-                # for y in range(modifier_disc, self.height - modifier_disc):
-                #     pattern.discard((modifier_disc, y))  # Remove obstacles along the horizontal line
-
-            obstacle_patterns.append(list(pattern))  # Store as list for JSON compatibility
-
+            pattern = self.generate_pattern()
+            obstacle_patterns.append(pattern)
         # Save to a JSON file
         print(f"Generated {obstacle_patterns} patterns.")
 
@@ -400,13 +356,26 @@ class GridWorldEnv(gym.Env):
             print(f"Error saving patterns: {e}")
 
 
+    def generate_pattern(self):
+        # Generate a single random obstacle pattern
+        pattern = set()
+        while len(pattern) < self.num_obstacles:
+            modifier = 2
+            x = int(self.np_random.integers(modifier, self.width - modifier))
+            y = int(self.np_random.integers(modifier, self.height - modifier))
+            pattern.add((x, y))
+        return list(pattern)
+
+    def manhattan(self, start, goal):
+        return abs(start[0] - goal[0]) + abs(start[1] - goal[1])
+
     def astar(self, start, goal):
         """
         Compute the shortest path using A* algorithm, without diagonal movement.
         """
-        def heuristic(a, b):
+        def heuristic(start, goal):
             # Manhattan distance as the heuristic (since we can't move diagonally)
-            return abs(a[0] - b[0]) + abs(a[1] - b[1])
+            return self.manhattan(start, goal)
 
         def get_neighbors(pos):
             # Get the valid neighbors around the current position (only horizontal/vertical)
@@ -526,20 +495,6 @@ class GridWorldEnv(gym.Env):
                 (pix_square_size * x, self.window_size),
                 width=line_width,
             )
-
-        # # Get the agent's view (for visible area)
-        # agent_x, agent_y = self._agent_location
-        # # Define the bounds of the visible area based on the agent's view
-        # min_x = max(agent_x - self.view_size, 0)
-        # max_x = min(agent_x + self.view_size + 1, self.size)
-        # min_y = max(agent_y - self.view_size, 0)
-        # max_y = min(agent_y + self.view_size + 1, self.size)
-        # overlay = pygame.Surface((max_x * pix_square_size, max_y * pix_square_size))
-        # # Fill the overlay with a gray color (with transparency)
-        # overlay.fill((100,100,100))  # Semi-transparent gray
-        # overlay.set_alpha(100)  # Semi-transparent gray
-        # # Blit the visible overlay on top of the canvas
-        # canvas.blit(overlay, (min_x * pix_square_size, min_y * pix_square_size))
 
         if self.render_mode == "human":
             # The following line copies our drawings from `canvas` to the visible window

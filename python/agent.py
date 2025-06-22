@@ -53,39 +53,10 @@ from gymnasium_env.envs import GridWorldEnv
 console = Console()
 
 
-class SaveOnTimestepCallback(BaseCallback):
-    def __init__(self, model, save_path, save_interval, model_name):
-        super(SaveOnTimestepCallback, self).__init__()
-        self.model = model
-        self.save_path = save_path
-        self.save_interval = save_interval
-        self.last_save = 0
-        self.model_name = model_name
-
-    def _on_step(self) -> bool:
-        # Check if we reached the save interval
-        if self.num_timesteps - self.last_save >= self.save_interval:
-            self.last_save = self.num_timesteps
-            checkpoint_path = os.path.join(self.save_path, f"{self.model_name}_{self.num_timesteps}.zip")
-            # Delete previous checkpoint
-            shutil.rmtree(self.save_path)
-            os.makedirs(self.save_path)
-
-            self.model.save(checkpoint_path)
-
-        return True
-
-
-
-
-
 class CustomCNNFeatureExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space, features_dim=512):
         super(CustomCNNFeatureExtractor, self).__init__(observation_space, features_dim)
 
-
-        # assert isinstance(observation_space, Dict), "Observation space must be a Dict space"
-        # n_input_channels = observation_space.spaces["image"].shape[0]  # Get the number of image channels
         n_input_channels = observation_space.shape[0]  # Get the number of image channels
         print(n_input_channels)
 
@@ -109,38 +80,6 @@ class CustomCNNFeatureExtractor(BaseFeaturesExtractor):
 
 
 
-
-def get_latest_model_and_iters(model_dir):
-    model_files = [f for f in os.listdir(model_dir) if f.endswith(".zip")]
-    if not model_files:
-        return None, 0
-
-    # Sort by modification time, newest first
-    model_files = sorted(model_files, key=lambda x: os.path.getmtime(os.path.join(model_dir, x)), reverse=True)
-    latest_model = model_files[0]
-    path = os.path.join(model_dir, latest_model)
-
-    return path
-
-
-# def make_env(render_mode=None):
-#     # env = gym.make("gymnasium_env/GridWorld-v0", render_mode=None)
-#     # env = gym.make("gymnasium_env/GridWorld-v0", render_mode="rgb_array")
-#     env = gym.make("gymnasium_env/GridWorld-v0", render_mode=render_mode)
-#     # env = RGBImgObsWrapper(env)
-#     # env = ImgObsWrapper(env)
-#     # env = gym.wrappers.TimeLimit(env, max_episode_steps=1000)
-#     return env
-
-def make_env(render_mode=None):
-    def _make_env():
-        # Ensure the environment is created with the correct render_mode
-        env = gym.make("gymnasium_env/GridWorld-v0", render_mode=render_mode)
-        return env
-    return _make_env  # Return the function
-
-
-
 def train_sb3():
 
     parser = argparse.ArgumentParser()
@@ -148,53 +87,83 @@ def train_sb3():
                         help="name of the folder")
     args = parser.parse_args()
 
-    # load the obstacle patterns from the file
-    file_path = 'obstacle_patterns.json'
-    if not os.path.exists(file_path):
-        GridWorldEnv().generate_pattern()
+    utils.seed(42)
 
     # Where to store trained model and logs
     model_dir = os.path.join("models", args.folder)
     log_dir = os.path.join("logs")
+    config_dir = os.path.join("configs", args.folder)
     os.makedirs(model_dir, exist_ok=True)
     os.makedirs(log_dir, exist_ok=True)
+    os.makedirs(config_dir, exist_ok=True)
 
-    # env = gym.make('gymnasium_env/GridWorld-v0', render_mode=None)
-    # env = gym.wrappers.TimeLimit(env, max_episode_steps=1000)
-    # env = gym.wrappers.RecordEpisodeStatistics(env)
-    # env = VecMonitor(SubprocVecEnv([make_env for _ in range(8)]))
-    env = make_vec_env(make_env(), n_envs=16, vec_env_cls=SubprocVecEnv)
-    # env = VecFrameStack(env, n_stack=8, channels_order='last')
-    # env = VecNormalize(env, norm_obs=True, norm_reward=True)
+    latest_model_path = utils.get_latest_model_path(model_dir)
+    model_config_path = utils.get_config_path(config_dir, "model_config.py")
+    env_config_path = utils.get_config_path(config_dir, "env_config.py")
 
+    policy_name = "MlpPolicy"
+
+
+
+    if env_config_path:
+        print(f"Loading existing env config: {env_config_path}")
+        config = utils.load_config_from_py(env_config_path)
+        env_kwargs = config.env_kwargs
+        use_frame_stacking = config.use_frame_stacking
+    else:
+        env_kwargs = {
+            "size": 10,
+            "num_obstacles": 15,
+            "num_patterns": 10,
+            "moving_target": False,
+            "dense_rewards": True,
+            "policy": policy_name
+        }
+
+        use_frame_stacking = False
+
+        utils.save_env_config(env_kwargs, use_frame_stacking, config_dir)
+
+    env = make_vec_env(utils.make_env(**env_kwargs), n_envs=12, seed=42, vec_env_cls=DummyVecEnv)
+    if use_frame_stacking:
+        env = VecFrameStack(env, n_stack=4, channels_order='last')
 
     TIMESTEPS = 10000
-
-    latest_model_path = get_latest_model_and_iters(model_dir)
 
     if latest_model_path:  # If a pre-trained model exists
         print(f"Loading existing model: {latest_model_path}")
         model = PPO.load(latest_model_path, env=env, tensorboard_log=log_dir, device='cpu')
     else:
-        model = PPO("CnnPolicy", env, verbose=1, device='cpu', tensorboard_log=log_dir,
-                             n_epochs=10,
-                             learning_rate=0.0003,
-                             ent_coef=0.01,
-                             clip_range=0.2,
-                             # vf_coef=0.4,
-                             batch_size=64,
-                             gae_lambda=0.95,
-                             gamma=0.99,
-                             seed=7,
-                             # policy_kwargs=dict(net_arch=dict(pi=[128, 128], vf=[128, 128]))  # New way
-                             # policy_kwargs=dict(net_arch=dict(pi=[256, 128, 128], vf=[256, 128, 128]))
-                             policy_kwargs=dict(
-                                 features_extractor_class=CustomCNNFeatureExtractor,
-                                 features_extractor_kwargs=dict(features_dim=512),
-                                 net_arch=dict(pi=[64], vf=[64]),
-                                 # lstm_hidden_size=128
-                             ),
-                            )
+        if model_config_path:  # only if config exists but not model, in case we modify the existing config and we delete the models
+            print(f"Loading existing model config: {model_config_path}")
+            config = utils.load_config_from_py(model_config_path)
+            policy_name = config.policy_name
+            hyperparams = config.hyperparams
+            print(hyperparams)
+        else:  # default fallback, no model and no config
+            hyperparams = dict(
+                n_steps=2048,
+                batch_size=64,
+                gamma=0.99,
+                gae_lambda=0.95,
+                learning_rate=0.0003,
+                ent_coef=0.00,
+                clip_range=0.2,
+                n_epochs=10,
+                max_grad_norm=0.5,
+                policy_kwargs=dict(
+                    # features_extractor_class=CustomCNNFeatureExtractor,
+                    # features_extractor_kwargs=dict(features_dim=512),
+                    net_arch=dict(pi=[64], vf=[64]),
+                    activation_fn=nn.Tanh
+                ),
+            )
+
+            utils.save_model_config(policy_name, hyperparams, config_dir)
+
+        model = PPO(policy_name, env, verbose=1, device='cpu', tensorboard_log=log_dir, seed=42, **hyperparams)
+
+    print(model.policy)
 
     # This loop will keep training until you stop it with Ctr-C.
     # Start another cmd prompt and launch Tensorboard: tensorboard --logdir logs
@@ -211,55 +180,16 @@ def train_sb3():
     while True:
         # model.learn(total_timesteps=TIMESTEPS, reset_num_timesteps=False)
         # model.save(f"{model_dir}/{model_name}_{TIMESTEPS*iters}") # Save a trained model every TIMESTEPS
+        save_cb = utils.SaveOnTimestepCallback(model, model_dir, save_interval=TIMESTEPS, model_name=model_name)
+        mean_goal_cb = utils.MeanGoalAchievedCallback()
+
 
         model.learn(
             total_timesteps=TIMESTEPS,
             reset_num_timesteps=False,
-            callback=SaveOnTimestepCallback(model, model_dir, save_interval=TIMESTEPS, model_name=model_name),
+            callback=[save_cb, mean_goal_cb],
             tb_log_name=model_name
         )
-
-
-def frame_stack_test_sb3():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--folder", default=None,
-                        help="name of the folder")
-    args = parser.parse_args()
-
-    model_dir = os.path.join("models", args.folder)
-
-    file_path = 'obstacle_patterns.json'
-    if not os.path.exists(file_path):
-        GridWorldEnv().generate_pattern()
-
-    env = make_vec_env(make_env(render_mode="human"), n_envs=1, vec_env_cls=DummyVecEnv)
-    env = VecFrameStack(env, n_stack=8, channels_order='last')
-
-    latest_model_path = get_latest_model_and_iters(model_dir)
-    print(latest_model_path)
-    model = PPO.load(f'{latest_model_path}', env=env)
-
-    # Run a test
-    for _ in range(20):
-        obs = env.reset()
-
-        # print(obs)
-        terminated = False
-        while True:
-            action, _ = model.predict(
-                observation=obs,
-                deterministic=True,
-            )
-            # obs, reward, terminated, truncated = env.step(np.array([action for _ in range(1)]))
-            obs, reward, terminated, truncated = env.step(action)
-
-            # unwrapped_env = env.envs[0].unwrapped
-            # unstacked_obs = unwrapped_env._get_obs()
-            # unstacked_obs = np.squeeze(unstacked_obs, axis=-1)
-            # print(unstacked_obs)
-            print(reward)
-
-    env.close()
 
 
 def test_sb3():
@@ -268,45 +198,72 @@ def test_sb3():
                         help="name of the folder")
     args = parser.parse_args()
 
+    utils.seed(42)
+
     model_dir = os.path.join("models", args.folder)
+    config_dir = os.path.join("configs", args.folder)
+    env_config_path = utils.get_config_path(config_dir, "env_config.py")
 
-    file_path = 'obstacle_patterns.json'
-    if not os.path.exists(file_path):
-        GridWorldEnv().generate_pattern()
-
-
-    env = gym.make('gymnasium_env/GridWorld-v0', render_mode="human")
-
-    latest_model_path = get_latest_model_and_iters(model_dir)
+    latest_model_path = utils.get_latest_model_path(model_dir)
     print(latest_model_path)
-    # Load model
-    model = PPO.load(f'{latest_model_path}', env=env)
 
-    # Run a test
-    for _ in range(20):
-        obs, info = env.reset()
+    config = utils.load_config_from_py(env_config_path)
+    env_kwargs = config.env_kwargs
+    use_frame_stacking = config.use_frame_stacking
 
-        while True:
-            # action_masks = get_action_masks(env)
-            # print(action_masks)
-            action, _ = model.predict(
-                observation=obs,
-                deterministic=True,
-                # action_masks=action_masks
-            )
-            obs, reward, terminated, truncated, info = env.step(action.item())
+    if not use_frame_stacking:
+        env = gym.make("gymnasium_env/GridWorld-v0", render_mode="human", **env_kwargs)
 
-            print(reward)
-            if terminated or truncated:
-                break
+        # Load model
+        model = PPO.load(f'{latest_model_path}', env=env)
 
-    env.close()
+        # Run a test
+        for _ in range(20):
+            obs, info = env.reset()
 
+            while True:
+                # action_masks = get_action_masks(env)
+                # print(action_masks)
+                action, _ = model.predict(
+                    observation=obs,
+                    deterministic=True,
+                    # action_masks=action_masks
+                )
+                obs, reward, terminated, truncated, info = env.step(action.item())
+
+                print(reward)
+                if terminated or truncated:
+                    break
+
+        env.close()
+    else:
+        env = make_vec_env(utils.make_env(render_mode="human", **env_kwargs), n_envs=1, seed=42, vec_env_cls=DummyVecEnv)
+        env = VecFrameStack(env, n_stack=4, channels_order='last')
+
+        model = PPO.load(f'{latest_model_path}', env=env)
+
+        # Run a test
+        for _ in range(20):
+            obs = env.reset()
+
+            # print(obs)
+            while True:
+                action, _ = model.predict(
+                    observation=obs,
+                    deterministic=True,
+                )
+                # obs, reward, terminated, truncated = env.step(np.array([action for _ in range(1)]))
+                obs, reward, terminated, truncated = env.step(action)
+
+                # unwrapped_env = env.envs[0].unwrapped
+                # unstacked_obs = unwrapped_env._get_obs()
+                # unstacked_obs = np.squeeze(unstacked_obs, axis=-1)
+                # print(unstacked_obs)
+                print(reward)
+
+        env.close()
 
 # ------------- sb3 -------------
-# if __name__ == '__main__':
-#     train_sb3()
-
 if __name__ == '__main__':
+    # train_sb3()
     test_sb3()
-    # frame_stack_test_sb3()
