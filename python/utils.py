@@ -9,7 +9,6 @@ import gymnasium as gym
 import numpy
 import numpy as np
 import torch
-from stable_baselines3.common.callbacks import BaseCallback
 from tensorboardX import SummaryWriter
 
 
@@ -100,58 +99,10 @@ def seed(seed):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
-
-
-class SaveOnTimestepCallback(BaseCallback):
-    def __init__(self, model, save_path, save_interval, model_name):
-        super(SaveOnTimestepCallback, self).__init__()
-        self.model = model
-        self.save_path = save_path
-        self.save_interval = save_interval
-        self.last_save = 0
-        self.model_name = model_name
-
-    def _on_step(self) -> bool:
-        # Check if we reached the save interval
-        if self.num_timesteps - self.last_save >= self.save_interval:
-            self.last_save = self.num_timesteps
-            checkpoint_path = os.path.join(self.save_path, f"{self.model_name}_{self.num_timesteps}.zip")
-            # Delete previous checkpoint
-            shutil.rmtree(self.save_path)
-            os.makedirs(self.save_path)
-
-            self.model.save(checkpoint_path)
-
-        return True
-
-
-
-class MeanGoalAchievedCallback(BaseCallback):
-    def __init__(self, verbose=0):
-        super().__init__(verbose)
-        self.final_rewards = []
-
-    def _on_step(self) -> bool:
-        done = self.locals.get("dones")  # vector of done flags or bool
-        rewards = self.locals.get("rewards")
-
-        if done is not None and rewards is not None:
-            # handle vectorized env case
-            if isinstance(done, (list, tuple)) or hasattr(done, "__len__"):
-                for d, r in zip(done, rewards):
-                    if d:  # episode done
-                        clipped_reward = 1 if r > 0 else 0
-                        self.final_rewards.append(clipped_reward)
-            else:
-                if done:
-                    clipped_reward = 1 if rewards > 0 else 0
-                    self.final_rewards.append(clipped_reward)
-        return True
-
-    def _on_rollout_end(self) -> None:
-        # Log mean final reward to TensorBoard at rollout end
-        if self.final_rewards:
-            mean_final_reward = np.mean(self.final_rewards)
-            # self.logger is the Stable Baselines3 logger for TensorBoard
-            self.logger.record("ep_goal_mean", mean_final_reward)
-            self.final_rewards.clear()  # reset for next rollout
+def get_device(policy):
+    if torch.backends.mps.is_available() and policy == 'CnnPolicy':
+        return 'mps'
+    elif torch.cuda.is_available() and policy == 'CnnPolicy':
+        return 'cuda'
+    else:
+        return 'cpu'

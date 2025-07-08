@@ -33,13 +33,13 @@ class Actions(Enum):
 class GridWorldEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, size=10, num_obstacles=15, num_patterns=10, moving_target=False, dense_rewards=True, policy="CnnPolicy"):
+    def __init__(self, render_mode=None, size=10, num_obstacles=15, num_patterns=10, target_moving_pattern=0, dense_rewards=True, policy="CnnPolicy"):
         self.size = size  # The size of the square grid
         self.window_size = 512 # The size of the PyGame window
         self.policy = policy
         self._agent_location = None
         self._target_location = None
-        self.moving_target = moving_target
+        self.target_moving_pattern = target_moving_pattern
         self.dense_rewards = dense_rewards
         self.obstacle_index = 0
         self.num_obstacles = num_obstacles
@@ -165,7 +165,8 @@ class GridWorldEnv(gym.Env):
         return {
             "distance": np.linalg.norm(
                 self._agent_location - self._target_location, ord=1
-            )
+            ),
+            "wrong_steps": self.wrong_step_count
         }
 
     def action_masks(self) -> np.ndarray:
@@ -199,6 +200,7 @@ class GridWorldEnv(gym.Env):
         super().reset(seed=seed)
 
         self.step_count = 0
+        self.wrong_step_count = 0
         self._gen_grid()
 
         observation = self._get_obs()
@@ -215,47 +217,84 @@ class GridWorldEnv(gym.Env):
         self.step_count += 1
 
         terminated = False
-        info = self._get_info()
         # print(action)
         # info = self.valid_action_mask()
         reward = 0
 
+        if self.num_obstacles == 0:
+            distance = self.manhattan(tuple(self._agent_location), tuple(self._target_location))
+        else:
+            path = self.astar(tuple(self._agent_location), tuple(self._target_location))
+            distance = len(path)
+
+
+        distanceBefore = distance
+
+        direction = self._action_to_direction[action]
+        new_agent_location = np.clip(
+            self._agent_location + direction, 0, self.size - 1
+        )
+
+        if self.num_obstacles == 0:
+            distance = self.manhattan(tuple(new_agent_location), tuple(self._target_location))
+        else:
+            path = self.astar(tuple(new_agent_location), tuple(self._target_location))
+            distance = len(path)
+
+        distanceAfter = distance
+
         if self.dense_rewards:
-            if self.num_obstacles == 0:
-                distance = self.manhattan(tuple(self._agent_location), tuple(self._target_location))
-            else:
-                path = self.astar(tuple(self._agent_location), tuple(self._target_location))
-                distance = len(path)
-
-
-            distanceBefore = distance
-
-            direction = self._action_to_direction[action]
-            new_agent_location = np.clip(
-                self._agent_location + direction, 0, self.size - 1
-            )
-            self._agent_location = new_agent_location
-
-            if self.num_obstacles == 0:
-                distance = self.manhattan(tuple(self._agent_location), tuple(self._target_location))
-            else:
-                path = self.astar(tuple(self._agent_location), tuple(self._target_location))
-                distance = len(path)
-
-            distanceAfter = distance
-
             if (distanceAfter < distanceBefore):
                 reward = 1 / 100
             elif (distanceAfter > distanceBefore):
                 reward = -2 / 100
             else:
                 reward = -1 / 100
-        else:
-            direction = self._action_to_direction[action]
-            new_agent_location = np.clip(
-                self._agent_location + direction, 0, self.size - 1
-            )
-            self._agent_location = new_agent_location
+
+        if (distanceAfter > distanceBefore):
+            self.wrong_step_count += 1
+
+        if self.target_moving_pattern == 1: #random
+            if np.random.rand() < 0.8:
+                target_action = self.action_space.sample()
+                target_direction = self._action_to_direction[target_action]
+                new_target_location = np.clip(
+                    self._target_location + target_direction, 1, self.size - 2
+                )
+            else:
+                new_target_location = self._target_location
+
+            if np.array_equal(new_agent_location, self._target_location) and np.array_equal(new_target_location, self._agent_location):
+                terminated = True
+                reward = 1 - 0.9 * (self.step_count / self.max_steps)
+
+            self._target_location = new_target_location
+
+        if self.target_moving_pattern == 2: #moves further away
+            distance_before = self.manhattan(tuple(self._agent_location), tuple(self._target_location))
+            new_target_location = None
+
+            if np.random.rand() < 0.8:
+                for action in Actions:
+                    target_action = action.value
+                    target_direction = self._action_to_direction[target_action]
+                    new_target_location = np.clip(
+                        self._target_location + target_direction, 1, self.size - 2
+                    )
+                    distance_after = self.manhattan(tuple(self._agent_location), tuple(new_target_location))
+                    if distance_after > distance_before:
+                        break
+            else:
+                new_target_location = self._target_location
+
+
+            if np.array_equal(new_agent_location, self._target_location) and np.array_equal(new_target_location, self._agent_location):
+                terminated = True
+                reward = 1 - 0.9 * (self.step_count / self.max_steps)
+
+            self._target_location = new_target_location
+
+
 
         if np.array_equal(new_agent_location, self._target_location):
             terminated = True
@@ -264,6 +303,10 @@ class GridWorldEnv(gym.Env):
         if tuple(new_agent_location) in self.obstacles:
             terminated = True
             reward = 0
+            self.wrong_step_count += 1
+
+
+        self._agent_location = new_agent_location
 
 
         truncated = False
@@ -274,15 +317,9 @@ class GridWorldEnv(gym.Env):
         if self.render_mode == "human":
             self._render_frame()
 
-        if self.moving_target:
-            target_action = self.action_space.sample()
-            target_direction = self._action_to_direction[target_action]
-            new_target_location = np.clip(
-                self._target_location + target_direction, 0, self.size - 1
-            )
-            self._target_location = new_target_location
-
         observation = self._get_obs()
+
+        info = self._get_info()
 
         return observation, reward, terminated, truncated, info
 
@@ -291,7 +328,6 @@ class GridWorldEnv(gym.Env):
         if self.num_patterns == 0:
             selected_pattern = self.generate_pattern() # always random pattern, not cycling between 10 patterns
         else:
-            # file_path = r"C:\Users\User\Desktop\Personal Project\tankio-master\obstacle_patterns.json"
             file_path = 'obstacle_patterns.json'
             if not os.path.exists(file_path):
                 self.save_patterns()

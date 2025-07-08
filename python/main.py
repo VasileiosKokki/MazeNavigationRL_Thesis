@@ -117,7 +117,6 @@ for line in sys.stdin:
                 test_sb3_called = True  # Set the flag to True after calling
 
                 env = gym.make('gymnasium_env/GridWorld-v0', render_mode="human")
-                #env = gym.make('FrozenLake-v1', render_mode="human", is_slippery=False, map_name="8x8")
 
                 # Load model
                 model = PPO.load('models/PPO_53dbb52a84d944dfafe0f3f504537dba_200720.zip', env=env)
@@ -131,10 +130,10 @@ for line in sys.stdin:
                 # debug_print([targets[0]['cellX'], targets[0]['cellY']])
                 env.unwrapped.updateDrawables(agent=agents[0], target=targets[0])
                 # obs, info = env.reset()
-                action_masks = get_action_masks(env)
-                print(action_masks)
+                # action_masks = get_action_masks(env)
+                # print(action_masks)
                 obs = env.unwrapped._get_obs()
-                action, _ = model.predict(observation=obs, deterministic=True, action_masks=action_masks) # Turn on deterministic, so predict always returns the same behavior
+                action, _ = model.predict(observation=obs, deterministic=True) # Turn on deterministic, so predict always returns the same behavior
                 debug_print(action)
                 # env._agent_location = np.array([agents[0]['cellX'], agents[0]['cellY']], dtype=int)
                 # env._target_location = np.array([targets[0]['cellX'], targets[0]['cellY']], dtype=int)
@@ -167,8 +166,6 @@ for line in sys.stdin:
                         normalized_step_y = delta_y / distance if distance != 0 else 0
                         agent['topLeftX'] += normalized_step_x * agent['speed'] * 5
                         agent['topLeftY'] += normalized_step_y * agent['speed'] * 5
-                        # agent['topLeftX'] = target_x
-                        # agent['topLeftY'] = target_y
 
 
 

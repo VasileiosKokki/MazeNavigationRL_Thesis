@@ -8,6 +8,7 @@ import json
 import time
 import uuid
 from rich.console import Console
+from torchview import draw_graph
 
 from gymnasium.spaces import Dict
 
@@ -49,6 +50,7 @@ from gymnasium.wrappers import TimeLimit
 from tqdm import tqdm
 
 from gymnasium_env.envs import GridWorldEnv
+from python import callbacks
 
 console = Console()
 
@@ -124,7 +126,7 @@ def train_sb3():
 
         utils.save_env_config(env_kwargs, use_frame_stacking, config_dir)
 
-    env = make_vec_env(utils.make_env(**env_kwargs), n_envs=12, seed=42, vec_env_cls=DummyVecEnv)
+    env = make_vec_env(utils.make_env(**env_kwargs), n_envs=8, seed=42, vec_env_cls=SubprocVecEnv)
     if use_frame_stacking:
         env = VecFrameStack(env, n_stack=4, channels_order='last')
 
@@ -132,7 +134,7 @@ def train_sb3():
 
     if latest_model_path:  # If a pre-trained model exists
         print(f"Loading existing model: {latest_model_path}")
-        model = PPO.load(latest_model_path, env=env, tensorboard_log=log_dir, device='cpu')
+        model = PPO.load(latest_model_path, env=env, tensorboard_log=log_dir, device=utils.get_device(env_kwargs['policy']))
     else:
         if model_config_path:  # only if config exists but not model, in case we modify the existing config and we delete the models
             print(f"Loading existing model config: {model_config_path}")
@@ -161,7 +163,7 @@ def train_sb3():
 
             utils.save_model_config(policy_name, hyperparams, config_dir)
 
-        model = PPO(policy_name, env, verbose=1, device='cpu', tensorboard_log=log_dir, seed=42, **hyperparams)
+        model = PPO(policy_name, env, verbose=1, device=utils.get_device(policy_name), tensorboard_log=log_dir, seed=42, **hyperparams)
 
     print(model.policy)
 
@@ -180,14 +182,17 @@ def train_sb3():
     while True:
         # model.learn(total_timesteps=TIMESTEPS, reset_num_timesteps=False)
         # model.save(f"{model_dir}/{model_name}_{TIMESTEPS*iters}") # Save a trained model every TIMESTEPS
-        save_cb = utils.SaveOnTimestepCallback(model, model_dir, save_interval=TIMESTEPS, model_name=model_name)
-        mean_goal_cb = utils.MeanGoalAchievedCallback()
+        save_cb = callbacks.SaveOnTimestepCallback(model, model_dir, save_interval=TIMESTEPS, model_name=model_name)
+        mean_goal_cb = callbacks.MeanGoalAchievedCallback()
+        max_length_cb = callbacks.MaxEpisodeLengthCallback()
+        max_wrong_steps_cb = callbacks.MaxWrongStepsCallback()
+
 
 
         model.learn(
             total_timesteps=TIMESTEPS,
             reset_num_timesteps=False,
-            callback=[save_cb, mean_goal_cb],
+            callback=[save_cb, mean_goal_cb, max_length_cb, max_wrong_steps_cb],
             tb_log_name=model_name
         )
 
@@ -242,6 +247,7 @@ def test_sb3():
 
         model = PPO.load(f'{latest_model_path}', env=env)
 
+        print(model.policy)
         # Run a test
         for _ in range(20):
             obs = env.reset()
@@ -262,6 +268,8 @@ def test_sb3():
                 print(reward)
 
         env.close()
+
+
 
 # ------------- sb3 -------------
 if __name__ == '__main__':

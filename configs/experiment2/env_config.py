@@ -2,7 +2,7 @@ env_kwargs = {
     "size": 10,
     "num_obstacles": 0,
     "num_patterns": 0,
-    "moving_target": False,
+    "target_moving_pattern": 0,
     "dense_rewards": False,
     "policy": "MlpPolicy",
 }
