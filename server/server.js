@@ -19,8 +19,19 @@ import {
 import { router } from './routes.js'
 import { spawn } from 'child_process';
 import * as fs from "fs";
+import path from "path";
+import { fileURLToPath } from 'url';
+import { ArgumentParser } from 'argparse';
 
-const pythonProcess = spawn('python', ['./python/main.py']);
+
+// const pythonProcess = spawn('python', ['../python/main.py']);
+const pythonExecutable = path.join(process.env.HOME, 'miniforge3/envs/tankio/bin/python');
+const mainScript = 'python/main.py';
+const dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const pythonProcess = spawn(pythonExecutable, [mainScript], {
+	cwd: path.resolve(dirname, '..') // set working dir to project root
+});
 
 const limiter = rateLimit({
 	windowMs: 1 * 60 * 1000, // 1 minute
@@ -33,36 +44,27 @@ expressWs(app)
 app.use(limiter);
 app.use(router);
 
+import readline from 'readline';
 
+const rl = readline.createInterface({
+	input: pythonProcess.stdout,
+	crlfDelay: Infinity
+});
 
-let dataBuffer = '';  // To accumulate incoming data
+rl.on('line', (line) => {
+	try {
+		const parsedData = JSON.parse(line);
 
-pythonProcess.stdout.on('data', (data) => {
-	dataBuffer += data.toString();  // Accumulate data as string
-
-	// Check if the buffer contains a complete message (e.g., using newline as delimiter)
-	let messages = dataBuffer.split('\n');
-
-	// Process each message except the last one, which may be incomplete
-	messages.slice(0, -1).forEach(message => {
-		try {
-			const parsedData = JSON.parse(message);  // Try to parse each complete JSON string
-
-			parsedData.forEach(newDrawable => {
-				const index = drawables.findIndex(existingDrawable => existingDrawable.clientId === newDrawable.clientId);
-				if (index !== -1) {
-					drawables[index] = newDrawable;  // Update drawable
-				}
-			});
-
-		} catch (e) {
-			//console.error('Failed to parse JSON:', e);
-			console.log(message)
-		}
-	});
-
-	// Keep the last (incomplete) part in the buffer
-	dataBuffer = messages[messages.length - 1];
+		parsedData.forEach(newDrawable => {
+			const existingDrawable = drawables.find(d => d.clientId === newDrawable.clientId);
+			if (existingDrawable) {
+				existingDrawable.topLeftX = newDrawable.topLeftX;
+				existingDrawable.topLeftY = newDrawable.topLeftY;
+			}
+		});
+	} catch (e) {
+		console.log(e);
+	}
 });
 
 
@@ -163,17 +165,47 @@ let currentHighestScore = 0;
 
 
 let domain;
-let port = parseInt(process.env.PORT, 10);
 const secretKey = "fd867a587aa02407952a83e59675e99e4c8de5bb6640db609eb8e7fdfb358373";
+// Create parser
+
+const parser = new ArgumentParser({
+	description: 'Server configuration'
+});
+
+parser.add_argument('--port', { type: 'int', default: 3001, help: 'Port number for the server' });
+
+parser.add_argument('--eval', { action: 'store_true', default: false, help: 'Run in evaluation mode' });
+
+// Parse arguments
+const args = parser.parse_args();
+
+// Use CLI argument instead of env var
+const port = args.port;
+const evalMode = args.eval;
 
 
+let cellNum = 10
+let cellSize = 250
+let mapSize = cellSize * cellNum
 
+const gameBoundsDimensions = {width:mapSize,height:mapSize};  // gamebounds
+const spatialGridDimensions = {rows:cellNum,cols:cellNum}
+const pathGridDimensions = {rows:cellNum,cols:cellNum}
 
-const gameBoundsDimensions = {width:3750,height:3750};  // gamebounds
-const spatialGridDimensions = {rows:15,cols:15}
-const pathGridDimensions = {rows:15,cols:15}
+let unwalkableCells = [];
 
+for (let i = 0; i < cellNum; i++) {
+	// Top row
+	unwalkableCells.push([0, i]);
+	// Bottom row
+	unwalkableCells.push([cellNum - 1, i]);
+	// Left col
+	unwalkableCells.push([i, 0]);
+	// Right col
+	unwalkableCells.push([i, cellNum - 1]);
+}
 
+unwalkableCells = unwalkableCells.map(([x, y]) => [x, y, x, y]);
 
 // const unwalkableCells = generateRandomWalls(0);
 // const unwalkableCells = [
@@ -204,29 +236,31 @@ const pathGridDimensions = {rows:15,cols:15}
 // 	[8, 2], [8, 3], [8, 6], [8, 7]
 // ].map(([x, y]) => [x, y, x, y]);
 
-let unwalkableCells;
 
-try {
-	// Read the file asynchronously
-	const data = fs.readFileSync('obstacles.json', 'utf8');
 
-	// Parse the JSON data
-	unwalkableCells = JSON.parse(data);
-
-	// Convert arrays (if necessary) into tuples (arrays of length 2)
-	unwalkableCells = unwalkableCells.map(([x, y]) => [x, y, x, y]);  // If items are in array format like [1, 1], [2, 2]
-
-	console.log(unwalkableCells); // Display obstacles
-
-} catch (error) {
-	if (error.code === 'ENOENT') {
-		console.log("The file 'obstacles.json' does not exist.");
-	} else if (error instanceof SyntaxError) {
-		console.log("Error: The file 'obstacles.json' contains invalid JSON.");
-	} else {
-		console.error("An unexpected error occurred:", error);
-	}
-}
+// let unwalkableCells;
+//
+// try {
+// 	// Read the file asynchronously
+// 	const data = fs.readFileSync('obstacle_patterns.json', 'utf8');
+//
+// 	// Parse the JSON data
+// 	unwalkableCells = JSON.parse(data);
+//
+// 	// Convert arrays (if necessary) into tuples (arrays of length 2)
+// 	unwalkableCells = unwalkableCells.map(([x, y]) => [x, y, x, y]);  // If items are in array format like [1, 1], [2, 2]
+//
+// 	console.log(unwalkableCells); // Display obstacles
+//
+// } catch (error) {
+// 	if (error.code === 'ENOENT') {
+// 		console.log("The file 'obstacles.json' does not exist.");
+// 	} else if (error instanceof SyntaxError) {
+// 		console.log("Error: The file 'obstacles.json' contains invalid JSON.");
+// 	} else {
+// 		console.error("An unexpected error occurred:", error);
+// 	}
+// }
 
 const unwalkableCellsExpanded = unwalkableCells.flatMap(([xStart, yStart, xEnd, yEnd]) =>
 	range(xStart, yStart, xEnd, yEnd)
@@ -268,15 +302,17 @@ setInterval(() => {
 	sendServerInfo(thisServer, secretKey);
 }, 2000);
 
-sendOneTimeDataToPython(gameBoundsDimensions, pathGridDimensions, unwalkableCellsExpanded, pythonProcess)
+sendOneTimeDataToPython(gameBoundsDimensions, pathGridDimensions, unwalkableCellsExpanded, evalMode, pythonProcess)
 
 
-
-for (let i = 0; i < 100; i++){     // up to 10000 lagless without shooting
-	clientCounter = createFood(clientCounter, drawables, gameBoundsDimensions);
+if (!evalMode) {
+	for (let i = 0; i < 100; i++) {     // up to 10000 lagless without shooting
+		clientCounter = createFood(clientCounter, drawables, cellSize, cellNum);
+	}
 }
+
 for (let i = 0; i < 1; i++) {
-	clientCounter = createAgent(clientCounter, drawables, gameBoundsDimensions);
+	clientCounter = createAgent(clientCounter, drawables, cellSize, cellNum);
 }
 
 
@@ -447,10 +483,10 @@ function GameLogic(){
 
 
 	// check currentHealth for death
-	drawables = checkForDeath(drawables, drawablesToBeRewarded, deadButConnected, clients, gameBoundsDimensions);
+	drawables = checkForDeath(drawables, drawablesToBeRewarded, deadButConnected, clients, cellSize, cellNum);
 
 	// check message from client for player respawn
-	({deadButConnected, currentHighestScore} = checkForRespawn(deadButConnected, drawables, clients, currentHighestScore, domain, port, secretKey, gameBoundsDimensions));
+	({deadButConnected, currentHighestScore} = checkForRespawn(deadButConnected, drawables, clients, currentHighestScore, domain, port, secretKey, cellSize, cellNum));
 }
 
 
@@ -550,4 +586,4 @@ app.listen(port);
 
 
 export { Drawable, setCurrentHighestScore, setCurrentPlayers, setDrawables, setClients, setClientCounter, getDrawables, getCurrentHighestScore, getClients, getCurrentPlayers, getClientCounter, getUnwalkableCells }
-export { maxPlayers, port, secretKey, gameBoundsDimensions, spatialGridDimensions, pathGridDimensions, drawables, unwalkableCells, unwalkableCellsExpanded }
+export { maxPlayers, port, secretKey, gameBoundsDimensions, cellSize, cellNum, spatialGridDimensions, pathGridDimensions, drawables, unwalkableCells, unwalkableCellsExpanded }

@@ -1,4 +1,4 @@
-import { sendPlayerCount, addListeners } from "./functions.js";
+import { sendPlayerCount, addListeners, getRandomPosition } from "./functions.js";
 import {
     Drawable,
     getClientCounter,
@@ -12,6 +12,8 @@ import {
     port,
     secretKey,
     gameBoundsDimensions,
+    cellSize,
+    cellNum,
     spatialGridDimensions,
     pathGridDimensions,
     getUnwalkableCells
@@ -58,10 +60,11 @@ router.ws('/connected', function(ws, req){
 
 
         const name = req.url.split('?')[1];
-        let width = 5;
-        let height = 5;
-        const topLeftX = Math.random()*(gameBoundsDimensions.width-30);
-        const topLeftY = Math.random()*(gameBoundsDimensions.height-30);
+        let width = 35;
+        let height = 35;
+        const { x, y } = getRandomPosition(cellSize, cellNum)
+        const topLeftX = x;
+        const topLeftY = y;
         const color = '#' + (Math.random() * 0xFFFFFF << 0).toString(16).padStart(6, '0');
         let speed = 10;
         let direction = null;

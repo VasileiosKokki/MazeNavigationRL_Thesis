@@ -1,0 +1,14 @@
+torch
+tensorflow
+stable-baselines3
+sb3-contrib
+gymnasium
+minigrid
+numpy
+matplotlib
+tqdm
+torchview
+pathfinding
+
+# to install custom gym env
+# pip install -e ./python/gym_world

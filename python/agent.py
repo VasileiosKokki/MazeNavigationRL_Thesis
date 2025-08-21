@@ -7,7 +7,6 @@ import sys
 import json
 import time
 import uuid
-from rich.console import Console
 from torchview import draw_graph
 
 from gymnasium.spaces import Dict
@@ -15,34 +14,24 @@ from gymnasium.spaces import Dict
 import utils
 
 import numpy as np
-import pydevd_pycharm
 
 import gymnasium as gym
 import torch
 from matplotlib import pyplot as plt
 from minigrid.wrappers import RGBImgObsWrapper, ImgObsWrapper
-from sb3_contrib.common.maskable.utils import get_action_masks
 from stable_baselines3 import A2C, PPO, DQN
 import os
 import tensorflow as tf
 
-from gym.envs.toy_text.frozen_lake import generate_random_map
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor, VecNormalize, DummyVecEnv, VecTransposeImage
-from sb3_contrib import QRDQN
-from sb3_contrib import RecurrentPPO
-from sb3_contrib import MaskablePPO
-from sb3_contrib.common.wrappers import ActionMasker
-from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
-from sb3_contrib.common.recurrent.policies import RecurrentMultiInputActorCriticPolicy
-from sb3_contrib.common.envs import InvalidActionEnvDiscrete
 from torch import nn, Tensor
 from stable_baselines3.common.vec_env import VecFrameStack
 
-import gymnasium_env
+
 from gymnasium.wrappers import FlattenObservation
 from gymnasium.wrappers import TimeLimit
 
@@ -51,9 +40,6 @@ from tqdm import tqdm
 
 from gymnasium_env.envs import GridWorldEnv
 from python import callbacks
-
-console = Console()
-
 
 class CustomCNNFeatureExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space, features_dim=512):
@@ -126,7 +112,7 @@ def train_sb3():
 
         utils.save_env_config(env_kwargs, use_frame_stacking, config_dir)
 
-    env = make_vec_env(utils.make_env(**env_kwargs), n_envs=8, seed=42, vec_env_cls=SubprocVecEnv)
+    env = make_vec_env(utils.make_env(**env_kwargs), n_envs=8, seed=42, vec_env_cls=DummyVecEnv)
     if use_frame_stacking:
         env = VecFrameStack(env, n_stack=4, channels_order='last')
 
@@ -197,7 +183,7 @@ def train_sb3():
         )
 
 
-def test_sb3():
+def try_sb3():
     parser = argparse.ArgumentParser()
     parser.add_argument("--folder", default=None,
                         help="name of the folder")
@@ -216,6 +202,11 @@ def test_sb3():
     env_kwargs = config.env_kwargs
     use_frame_stacking = config.use_frame_stacking
 
+    first_time = True
+    episodes_desired_num = 5
+    visited_cells = []
+    grid_size = env_kwargs["size"]
+
     if not use_frame_stacking:
         env = gym.make("gymnasium_env/GridWorld-v0", render_mode="human", **env_kwargs)
 
@@ -223,9 +214,15 @@ def test_sb3():
         model = PPO.load(f'{latest_model_path}', env=env)
 
         # Run a test
-        for _ in range(20):
-            obs, info = env.reset()
+        for i in range(episodes_desired_num):
+            if first_time:
+                obs, info = env.reset(seed=42)
+                first_time = False
+            else:
+                obs, info = env.reset()
 
+            agent_location = tuple(obs[:2])
+            utils.collect_agent_positions(agent_location, visited_cells, i)
             while True:
                 # action_masks = get_action_masks(env)
                 # print(action_masks)
@@ -237,9 +234,14 @@ def test_sb3():
                 obs, reward, terminated, truncated, info = env.step(action.item())
 
                 print(reward)
+
+                agent_location = tuple(obs[:2])
+                utils.collect_agent_positions(agent_location, visited_cells, i)
+
                 if terminated or truncated:
                     break
 
+        utils.save_agent_positions(visited_cells, args.folder, grid_size)
         env.close()
     else:
         env = make_vec_env(utils.make_env(render_mode="human", **env_kwargs), n_envs=1, seed=42, vec_env_cls=DummyVecEnv)
@@ -249,8 +251,12 @@ def test_sb3():
 
         print(model.policy)
         # Run a test
-        for _ in range(20):
-            obs = env.reset()
+        for _ in range(episodes_desired_num):
+            if first_time:
+                obs = env.reset(seed=42)
+                first_time = False
+            else:
+                obs = env.reset()
 
             # print(obs)
             while True:
@@ -274,4 +280,4 @@ def test_sb3():
 # ------------- sb3 -------------
 if __name__ == '__main__':
     # train_sb3()
-    test_sb3()
+    try_sb3()

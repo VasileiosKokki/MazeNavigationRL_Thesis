@@ -31,7 +31,7 @@ class Actions(Enum):
     down = 3
 
 class GridWorldEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 2}
 
     def __init__(self, render_mode=None, size=10, num_obstacles=15, num_patterns=10, target_moving_pattern=0, dense_rewards=True, policy="CnnPolicy"):
         self.size = size  # The size of the square grid
@@ -169,31 +169,31 @@ class GridWorldEnv(gym.Env):
             "wrong_steps": self.wrong_step_count
         }
 
-    def action_masks(self) -> np.ndarray:
-        # Initialize action mask (0: invalid, 1: valid) for 5 actions
-        action_mask = [1] * 4
-
-        # Get agent's current position
-        x, y = self._agent_location
-
-        # Check boundaries and obstacles for each action
-        if y == 0 or (x, y - 1) in self.obstacles:  # Up
-            action_mask[Actions.up.value] = 0
-        if y == self.size - 1 or (x, y + 1) in self.obstacles:  # Down
-            action_mask[Actions.down.value] = 0
-        if x == 0 or (x - 1, y) in self.obstacles:  # Left
-            action_mask[Actions.left.value] = 0
-        if x == self.size - 1 or (x + 1, y) in self.obstacles:  # Right
-            action_mask[Actions.right.value] = 0
-
-        # print(action_mask)
-
-        # The Still action is always valid
-        # action_mask[Actions.still.value] = True
-
-        # Return the info dictionary with the action mask
-        action_mask = np.array(action_mask)
-        return action_mask
+    # def action_masks(self) -> np.ndarray:
+    #     # Initialize action mask (0: invalid, 1: valid) for 5 actions
+    #     action_mask = [1] * 4
+    #
+    #     # Get agent's current position
+    #     x, y = self._agent_location
+    #
+    #     # Check boundaries and obstacles for each action
+    #     if y == 0 or (x, y - 1) in self.obstacles:  # Up
+    #         action_mask[Actions.up.value] = 0
+    #     if y == self.size - 1 or (x, y + 1) in self.obstacles:  # Down
+    #         action_mask[Actions.down.value] = 0
+    #     if x == 0 or (x - 1, y) in self.obstacles:  # Left
+    #         action_mask[Actions.left.value] = 0
+    #     if x == self.size - 1 or (x + 1, y) in self.obstacles:  # Right
+    #         action_mask[Actions.right.value] = 0
+    #
+    #     # print(action_mask)
+    #
+    #     # The Still action is always valid
+    #     # action_mask[Actions.still.value] = True
+    #
+    #     # Return the info dictionary with the action mask
+    #     action_mask = np.array(action_mask)
+    #     return action_mask
 
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
@@ -349,8 +349,8 @@ class GridWorldEnv(gym.Env):
             # Generate a random position for the agent within the grid bounds
             # Generate a random position for the agent
             while True:
-                agent_x = self.np_random.integers(1, self.width - 1)
-                agent_y = self.np_random.integers(1, self.height - 1)
+                agent_x = self.np_random.integers(1, self.width - 2)
+                agent_y = self.np_random.integers(1, self.height - 2)
                 if (agent_x, agent_y) not in self.obstacles:
                     break
 
@@ -358,8 +358,8 @@ class GridWorldEnv(gym.Env):
 
             # Generate a random position for the goal
             while True:
-                goal_x = self.np_random.integers(1, self.width - 1)
-                goal_y = self.np_random.integers(1, self.height - 1)
+                goal_x = self.np_random.integers(1, self.width - 2)
+                goal_y = self.np_random.integers(1, self.height - 2)
                 if (goal_x, goal_y) not in self.obstacles and (goal_x, goal_y) != tuple(self._agent_location):
                     break
 
@@ -397,8 +397,8 @@ class GridWorldEnv(gym.Env):
         pattern = set()
         while len(pattern) < self.num_obstacles:
             modifier = 2
-            x = int(self.np_random.integers(modifier, self.width - modifier))
-            y = int(self.np_random.integers(modifier, self.height - modifier))
+            x = int(self.np_random.integers(modifier, self.width - modifier - 1))
+            y = int(self.np_random.integers(modifier, self.height - modifier - 1))
             pattern.add((x, y))
         return list(pattern)
 

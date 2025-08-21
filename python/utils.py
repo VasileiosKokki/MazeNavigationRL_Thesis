@@ -9,7 +9,6 @@ import gymnasium as gym
 import numpy
 import numpy as np
 import torch
-from tensorboardX import SummaryWriter
 
 
 def get_latest_model_path(model_dir):
@@ -31,6 +30,13 @@ def get_config_path(model_dir, config_file):
     if os.path.isfile(full_path):
         return full_path
     return None
+
+def get_eval_path(eval_dir):
+    """
+    Always return the full path to the evaluation file.
+    Creates a new path even if the file doesn't exist yet.
+    """
+    return os.path.join(eval_dir, "visited_cells.txt")
 
 
 def save_model_config(policy_name, hyperparams, save_dir):
@@ -106,3 +112,34 @@ def get_device(policy):
         return 'cuda'
     else:
         return 'cpu'
+
+def collect_agent_positions(current_pos, positions, i):
+    """
+    Collects agent positions into positions[i].
+    Only adds if different from last saved.
+    """
+
+    # Ensure the list for this index exists
+    while len(positions) <= i:
+        positions.append([])
+
+    # Add only if new or different
+    if not positions[i] or positions[i][-1] != current_pos:
+        positions[i].append(current_pos)
+
+def save_agent_positions(positions, folder, grid_width):
+    """
+    Saves agent positions (positions[i]) into a text file as CSV.
+    - Each positions[i] is written in a single line
+    - Values are comma-separated
+    - Newline when episode (i) changes
+    """
+    eval_dir = os.path.join("evaluations", folder)
+    os.makedirs(eval_dir, exist_ok=True)
+    eval_path = get_eval_path(eval_dir)
+
+    with open(eval_path, "w") as f:  # overwrite each time to keep it clean
+        for episode_positions in positions:
+            linear_values = [str(int(y * grid_width + x)) for x, y in episode_positions]
+            line = ",".join(linear_values)
+            f.write(line + "\n")

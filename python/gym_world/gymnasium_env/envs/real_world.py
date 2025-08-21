@@ -21,10 +21,10 @@ class Actions(Enum):
     down = 3
     # still = 4
 
-class GridWorldEnv(gym.Env):
+class RealWorldEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 60}
 
-    def __init__(self, render_mode=None, size=15):
+    def __init__(self, render_mode=None, size=10):
         self.size = size  # The size of the square grid
         self.window_size = 512  # The size of the PyGame window
         self._agent_location = None
@@ -35,19 +35,31 @@ class GridWorldEnv(gym.Env):
         # Observations are dictionaries with the agent's and the target's location.
         # Each location is encoded as an element of {0, ..., `size`}^2,
         # i.e. MultiDiscrete([size, size]).
-        try:
-            with open("obstacles.json", "r") as file:
-                obstacles = json.load(file)
-                obstacles = list(map(tuple, obstacles))
-        except FileNotFoundError:
-            print("The file 'obstacles.json' does not exist.")
-        except json.JSONDecodeError:
-            print("Error: The file 'obstacles.json' contains invalid JSON.")
-        self.obstacles = obstacles
-        # for obstacle in obstacles:
-        #     self.grid.node(obstacle[0], obstacle[1]).walkable = False
 
-        self.observation_space = spaces.MultiDiscrete([size, size, size, size])
+        # try:
+        #     with open("obstacles.json", "r") as file:
+        #         obstacles = json.load(file)
+        #         obstacles = list(map(tuple, obstacles))
+        # except FileNotFoundError:
+        #     print("The file 'obstacles.json' does not exist.")
+        # except json.JSONDecodeError:
+        #     print("Error: The file 'obstacles.json' contains invalid JSON.")
+        # self.obstacles = obstacles
+        border_obstacle_count = 2 * self.size + 2 * (self.size - 2)
+
+        self.obstacles = set()
+        for i in range(self.size): # we add the borders
+            self.obstacles.add((i, 0))  # Left edge
+            self.obstacles.add((i, self.size - 1))  # Right edge
+            self.obstacles.add((0, i))  # Top edge
+            self.obstacles.add((self.size - 1, i))  # Bottom edge
+
+        self.observation_space = spaces.Box(
+            low=0,
+            high=self.size - 1,
+            shape=(2 + 2 + 2 * border_obstacle_count,),
+            dtype="uint8"
+        )
 
         # We have 4 actions, corresponding to "right", "up", "left", "down", "right"
         self.action_space = spaces.Discrete(4)
@@ -86,12 +98,13 @@ class GridWorldEnv(gym.Env):
     #     """Randomly generate obstacle locations on the grid."""
     #     obstacles = set()
     #     while len(obstacles) < self.num_obstacles:
-    #         obstacle = tuple(self.np_random.integers(0, self.size, size=2))
+    #         obstacle = tuple(self.np_random.integers(0, self.size - 1, size=2))
     #         obstacles.add(obstacle)
     #     return obstacles
 
     def _get_obs(self):
-        result = np.concatenate([self._agent_location, self._target_location])
+        result = np.concatenate([np.array(self._agent_location), np.array(self._target_location), np.array(sorted(self.obstacles)).flatten(),])
+        result = result.astype(np.uint8)
         return result
 
 
@@ -111,31 +124,31 @@ class GridWorldEnv(gym.Env):
             self._target_location = np.array([target['cellX'], target['cellY']], dtype=int)
 
 
-    def action_masks(self) -> np.ndarray:
-        # Initialize action mask (0: invalid, 1: valid) for 5 actions
-        action_mask = [1] * 4
-
-        # Get agent's current position
-        x, y = self._agent_location
-
-        # Check boundaries and obstacles for each action
-        if y == 0 or (x, y - 1) in self.obstacles:  # Up
-            action_mask[Actions.up.value] = 0
-        if y == self.size - 1 or (x, y + 1) in self.obstacles:  # Down
-            action_mask[Actions.down.value] = 0
-        if x == 0 or (x - 1, y) in self.obstacles:  # Left
-            action_mask[Actions.left.value] = 0
-        if x == self.size - 1 or (x + 1, y) in self.obstacles:  # Right
-            action_mask[Actions.right.value] = 0
-
-        # print(action_mask)
-
-        # The Still action is always valid
-        # action_mask[Actions.still.value] = True
-
-        # Return the info dictionary with the action mask
-        action_mask = np.array(action_mask)
-        return action_mask
+    # def action_masks(self) -> np.ndarray:
+    #     # Initialize action mask (0: invalid, 1: valid) for 5 actions
+    #     action_mask = [1] * 4
+    #
+    #     # Get agent's current position
+    #     x, y = self._agent_location
+    #
+    #     # Check boundaries and obstacles for each action
+    #     if y == 0 or (x, y - 1) in self.obstacles:  # Up
+    #         action_mask[Actions.up.value] = 0
+    #     if y == self.size - 1 or (x, y + 1) in self.obstacles:  # Down
+    #         action_mask[Actions.down.value] = 0
+    #     if x == 0 or (x - 1, y) in self.obstacles:  # Left
+    #         action_mask[Actions.left.value] = 0
+    #     if x == self.size - 1 or (x + 1, y) in self.obstacles:  # Right
+    #         action_mask[Actions.right.value] = 0
+    #
+    #     # print(action_mask)
+    #
+    #     # The Still action is always valid
+    #     # action_mask[Actions.still.value] = True
+    #
+    #     # Return the info dictionary with the action mask
+    #     action_mask = np.array(action_mask)
+    #     return action_mask
 
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random

@@ -201,15 +201,30 @@ function addListeners(drawable, ws, domain, port, secretKey){
 
 }
 
+function getRandomPosition(cellSize, cellNum) {
+    const offset = 1
 
-function respawnPlayer(oldDrawable, ws, drawables, clients, currentHighestScore, domain, port, secretKey, gameBoundsDimensions){
+    const minX = cellSize * offset;
+    const maxX = cellSize * (cellNum - 1 - offset);
+    const minY = cellSize * offset;
+    const maxY = cellSize * (cellNum - 1 - offset);
+
+    const centerX = minX + Math.random() * maxX;
+    const centerY = minY + Math.random() * maxY;
+
+    return { x: centerX, y: centerY };
+}
+
+
+function respawnPlayer(oldDrawable, ws, drawables, clients, currentHighestScore, domain, port, secretKey){
     const clientId = oldDrawable.clientId;
 
     const name = oldDrawable.name;
     let width = 150;
     let height = 150;
-    const topLeftX = Math.random()*(gameBoundsDimensions.width-30);
-    const topLeftY = Math.random()*(gameBoundsDimensions.height-30);
+    const { x, y } = getRandomPosition(cellSize, cellNum)
+    const topLeftX = x;
+    const topLeftY = y;
     const color = '#' + (Math.random() * 0xFFFFFF << 0).toString(16).padStart(6, '0');
     let speed = 5;
     let direction = null;
@@ -285,7 +300,6 @@ function updateLevel(drawable, clients){
     }
 
 
-
     const message = JSON.stringify({type:'experience',data:{level:drawable.level,experience:drawable.experience,score:drawable.score}});
     const nonCompressedData = message;
 
@@ -302,7 +316,7 @@ function updateLevel(drawable, clients){
 }
 
 
-function checkForDeath(drawables, drawablesToBeRewarded, deadButConnected, clients, gameBoundsDimensions){
+function checkForDeath(drawables, drawablesToBeRewarded, deadButConnected, clients, cellSize, cellNum){
     drawables = drawables.filter(function(drawable){
         if (drawable.currentHealth <= 0){
             // experience distribution
@@ -314,14 +328,14 @@ function checkForDeath(drawables, drawablesToBeRewarded, deadButConnected, clien
                     setTimeout(() => {
                         const drawables = getDrawables();
                         const clientCounter = getClientCounter();
-                        const updatedClientCounter = createFood(clientCounter, drawables, gameBoundsDimensions)
+                        const updatedClientCounter = createFood(clientCounter, drawables, cellSize, cellNum)
                         setClientCounter(updatedClientCounter)
                     }, 10000);
                 } else if (drawable.type == 'agent'){
                     setTimeout(() => {
                         const drawables = getDrawables();
                         const clientCounter = getClientCounter();
-                        const updatedClientCounter = createAgent(clientCounter, drawables, gameBoundsDimensions)
+                        const updatedClientCounter = createAgent(clientCounter, drawables, cellSize, cellNum)
                         setClientCounter(updatedClientCounter)
                     }, 10000);
                 } else
@@ -353,15 +367,16 @@ function checkForDeath(drawables, drawablesToBeRewarded, deadButConnected, clien
 }
 
 
-function createFood(clientCounter, drawables, gameBoundsDimensions){
+function createFood(clientCounter, drawables, cellSize, cellNum){
     const clientId = clientCounter;
     clientCounter++;
 
     const name = null;
     let width = 30;
     let height = 30;
-    const topLeftX = Math.random()*(gameBoundsDimensions.width-30);
-    const topLeftY = Math.random()*(gameBoundsDimensions.height-30);
+    const { x, y } = getRandomPosition(cellSize, cellNum)
+    const topLeftX = x;
+    const topLeftY = y;
     let color;
     if (clientId % 2 == 0){
         color = '#AA0000'
@@ -400,13 +415,13 @@ function createFood(clientCounter, drawables, gameBoundsDimensions){
 }
 
 
-function checkForRespawn(deadButConnected, drawables, clients, currentHighestScore, domain, port, secretKey, gameBoundsDimensions){
+function checkForRespawn(deadButConnected, drawables, clients, currentHighestScore, domain, port, secretKey, cellSize, cellNum){
     clients.forEach(function(client){
         if (client.connection.readyState == 1){
             deadButConnected = deadButConnected.filter(function(drawable){
                 if (drawable.clientId == client.clientId && drawable.isToBeRespawned == true){
                     client.connection.removeAllListeners();
-                    currentHighestScore = respawnPlayer(drawable, client.connection, drawables, clients, currentHighestScore, domain, port, secretKey, gameBoundsDimensions)
+                    currentHighestScore = respawnPlayer(drawable, client.connection, drawables, clients, currentHighestScore, domain, port, secretKey, cellSize, cellNum)
                     return false;  // remove if client sent message to respawn
                 }
                 return true;  // otherwise keep it
@@ -690,15 +705,16 @@ function isInUnwalkableCell(drawable, unwalkableCells, gameBoundsDimensions, pat
     });
 }
 
-function createAgent(clientCounter, drawables, gameBoundsDimensions){
+function createAgent(clientCounter, drawables, cellSize, cellNum){
     const clientId = clientCounter;
     clientCounter++;
 
     const name = '';
     let width = 35;
     let height = 35;
-    const topLeftX = Math.random()*(gameBoundsDimensions.width-30);
-    const topLeftY = Math.random()*(gameBoundsDimensions.height-30);
+    const { x, y } = getRandomPosition(cellSize, cellNum)
+    const topLeftX = x;
+    const topLeftY = y;
     let color;
     if (clientId % 2 == 0){
         color = '#AA0000'
@@ -768,14 +784,14 @@ function sendDrawablesToPython(drawables, pythonProcess) {
     }) + '\n');  // Send data via stdin
 }
 
-function sendOneTimeDataToPython(gameBoundsDimensions, pathGridDimensions, unwalkableCellsExpanded, pythonProcess) {
+function sendOneTimeDataToPython(gameBoundsDimensions, pathGridDimensions, unwalkableCellsExpanded, evalMode, pythonProcess) {
     // Convert the data to JSON and send it to Python
     pythonProcess.stdin.write(JSON.stringify({
         type: 'oneTimeData',
-        data: {gameBoundsDimensions,pathGridDimensions, unwalkableCellsExpanded}
+        data: {gameBoundsDimensions,pathGridDimensions, unwalkableCellsExpanded, evalMode}
     }) + '\n'); // Sending one-time data
 }
 
 
 
-export { disconnect, sendPlayerCount, findHighestScore, addListeners, respawnPlayer, turnLevelToExperience, updateLevel, checkForDeath, createFood, checkForRespawn, createProjectile, sendServerInfo, checkCollision, knockbackWithDmg, clamp, range, isInUnwalkableCell, createAgent, generateRandomWalls, getRandomInt, sendDrawablesToPython, sendOneTimeDataToPython }
+export { disconnect, sendPlayerCount, findHighestScore, addListeners, respawnPlayer, turnLevelToExperience, updateLevel, checkForDeath, createFood, checkForRespawn, createProjectile, sendServerInfo, checkCollision, knockbackWithDmg, clamp, range, isInUnwalkableCell, createAgent, generateRandomWalls, getRandomInt, sendDrawablesToPython, sendOneTimeDataToPython, getRandomPosition }

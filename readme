@@ -1,0 +1,32 @@
+Tankio
+An MVC (Thin-Client) Model Multiplayer Game.
+
+In this setup, a server is responsible for managing connections from clients and handling user actions by continuously updating the game's model. The model represents the game world, with each player represented as a square that can move around. The server calculates the state of this model.
+
+On the client side, the game continuously receives updates about the model's state as an array of arrays every 40 milliseconds. It then uses this data to render the game world on an HTML canvas.
+
+Installation Instructions To get started, follow these steps:
+
+Clone or download the project files.
+
+Open your terminal and navigate to the project directory.
+
+Run the following command to install the necessary npm modules: npm install
+
+Running the Game To run the game, execute one of the following commands:
+
+Using npm: npm start
+
+Using Node.js: node server.js
+
+After starting the server, you can access the client at http://localhost:3000/client.html.
+
+Please note that the server is set to listen on port 3000, and the client's WebSocket connection request is configured to connect to "localhost." Ensure that you adjust these settings as needed to match your specific environment or deployment.
+
+
+script = python/agent.py
+train/test with:
+--folder experiment1
+
+for js server
+npm install express

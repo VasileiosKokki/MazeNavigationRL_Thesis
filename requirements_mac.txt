@@ -1,0 +1,22 @@
+# PyTorch (ARM-native via conda)
+# Install via conda first: conda install pytorch torchvision torchaudio -c pytorch
+# Do NOT include torch in pip requirements for M1, let conda handle it
+
+# TensorFlow (ARM-native)
+tensorflow-macos
+tensorflow-metal
+
+# Reinforcement Learning
+stable-baselines3
+sb3-contrib
+
+# Environments
+gymnasium
+minigrid
+
+# Utilities
+numpy
+matplotlib
+tqdm
+rich
+torchview
