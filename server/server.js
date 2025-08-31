@@ -312,7 +312,7 @@ if (!evalMode) {
 }
 
 for (let i = 0; i < 1; i++) {
-	clientCounter = createAgent(clientCounter, drawables, cellSize, cellNum);
+	clientCounter = createAgent(clientCounter, drawables, cellSize, cellNum, evalMode);
 }
 
 

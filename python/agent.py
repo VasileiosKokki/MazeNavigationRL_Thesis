@@ -187,7 +187,11 @@ def try_sb3():
     parser = argparse.ArgumentParser()
     parser.add_argument("--folder", default=None,
                         help="name of the folder")
+    parser.add_argument("--eval", action="store_true",
+                        help="run evaluation mode")
     args = parser.parse_args()
+    # eval for experiment 2
+    eval_mode = args.eval
 
     utils.seed(42)
 
@@ -203,12 +207,17 @@ def try_sb3():
     use_frame_stacking = config.use_frame_stacking
 
     first_time = True
-    episodes_desired_num = 5
+    if eval_mode:
+        episodes_desired_num = 100
+        render_fps = 15
+    else:
+        episodes_desired_num = 5
+        render_fps = 4
     visited_cells = []
     grid_size = env_kwargs["size"]
 
     if not use_frame_stacking:
-        env = gym.make("gymnasium_env/GridWorld-v0", render_mode="human", **env_kwargs)
+        env = gym.make("gymnasium_env/GridWorld-v0", render_mode="human", render_fps=render_fps, **env_kwargs)
 
         # Load model
         model = PPO.load(f'{latest_model_path}', env=env)
@@ -221,8 +230,9 @@ def try_sb3():
             else:
                 obs, info = env.reset()
 
-            agent_location = tuple(obs[:2])
-            utils.collect_agent_positions(agent_location, visited_cells, i)
+            if eval_mode:
+                agent_location = tuple(obs[:2])
+                utils.collect_agent_positions(agent_location, visited_cells, i)
             while True:
                 # action_masks = get_action_masks(env)
                 # print(action_masks)
@@ -235,13 +245,15 @@ def try_sb3():
 
                 print(reward)
 
-                agent_location = tuple(obs[:2])
-                utils.collect_agent_positions(agent_location, visited_cells, i)
+                if eval_mode:
+                    agent_location = tuple(obs[:2])
+                    utils.collect_agent_positions(agent_location, visited_cells, i)
 
                 if terminated or truncated:
                     break
 
-        utils.save_agent_positions(visited_cells, args.folder, grid_size)
+        if eval_mode:
+            utils.save_agent_positions(visited_cells, args.folder, grid_size)
         env.close()
     else:
         env = make_vec_env(utils.make_env(render_mode="human", **env_kwargs), n_envs=1, seed=42, vec_env_cls=DummyVecEnv)

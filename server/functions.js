@@ -705,7 +705,7 @@ function isInUnwalkableCell(drawable, unwalkableCells, gameBoundsDimensions, pat
     });
 }
 
-function createAgent(clientCounter, drawables, cellSize, cellNum){
+function createAgent(clientCounter, drawables, cellSize, cellNum, evalMode){
     const clientId = clientCounter;
     clientCounter++;
 
@@ -721,7 +721,12 @@ function createAgent(clientCounter, drawables, cellSize, cellNum){
     } else {
         color = '#00AAAA'
     }
-    let speed = 5;
+    let speed;
+    if (evalMode) {
+        speed = 15;
+    } else {
+        speed = 5;
+    }
     let direction = null;
     let maxHealth = 2000;
     let currentHealth = maxHealth;

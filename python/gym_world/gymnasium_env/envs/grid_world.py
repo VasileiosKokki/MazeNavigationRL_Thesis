@@ -31,9 +31,9 @@ class Actions(Enum):
     down = 3
 
 class GridWorldEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 2}
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, size=10, num_obstacles=15, num_patterns=10, target_moving_pattern=0, dense_rewards=True, policy="CnnPolicy"):
+    def __init__(self, render_mode=None, render_fps=4, size=10, num_obstacles=15, num_patterns=10, target_moving_pattern=0, dense_rewards=True, policy="CnnPolicy"):
         self.size = size  # The size of the square grid
         self.window_size = 512 # The size of the PyGame window
         self.policy = policy
@@ -48,6 +48,7 @@ class GridWorldEnv(gym.Env):
         self.height = size
         self.max_steps = 100
         self.reward_range = (-1, 1)
+        self.metadata["render_fps"] = render_fps
 
         border_obstacle_count = 2 * self.size + 2 * (self.size - 2)  # = 4 * self.size - 4
         num_obstacles = self.num_obstacles + border_obstacle_count
@@ -248,8 +249,6 @@ class GridWorldEnv(gym.Env):
                 reward = 1 / 100
             elif (distanceAfter > distanceBefore):
                 reward = -2 / 100
-            else:
-                reward = -1 / 100
 
         if (distanceAfter > distanceBefore):
             self.wrong_step_count += 1

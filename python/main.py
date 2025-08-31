@@ -116,6 +116,7 @@ rejoinedPlayer = False
 eval_mode = False
 visited_cells = []
 i = 0
+episodes_desired_num = 100
 for line in sys.stdin:
     try:
         data = json.loads(line)
@@ -194,7 +195,6 @@ for line in sys.stdin:
 
                     last_execution_time = current_time
 
-                    episodes_desired_num = 5
                     if i <= episodes_desired_num - 1:
                         current_pos = (agent['cellX'], agent['cellY'])
                         utils.collect_agent_positions(current_pos, visited_cells, i)
