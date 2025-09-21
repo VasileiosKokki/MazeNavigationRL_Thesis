@@ -1,5 +1,4 @@
 function mainDraw(drawable, ctx, zoomLevel){
-    //const id = drawable.clientId;
     const x = drawable.topLeftX * zoomLevel;
     const y = drawable.topLeftY * zoomLevel;
     const width = drawable.width * zoomLevel;
@@ -19,16 +18,6 @@ function mainDraw(drawable, ctx, zoomLevel){
 
     } else {   //  anything other than rectangle causes more lag
 
-        // Draw a triangle shape <- sadly deprecated because collision was impossible to do
-        /*
-        ctx.beginPath();
-          ctx.moveTo(x, y+height);
-          ctx.lineTo(x+width, y+height);
-          ctx.lineTo(x+width/2, y);
-          ctx.closePath();
-          ctx.fill();
-        */
-
         // Draw an oval shape
 
         const centerX = x + width / 2;
@@ -40,12 +29,8 @@ function mainDraw(drawable, ctx, zoomLevel){
 
 
     }
-    //if (drawable.type != 'player'){
     ctx.fill();
-    //}
-    //if (drawable.type != 'player'){
     ctx.stroke();
-    //}
 }
 
 
@@ -90,14 +75,9 @@ function drawCannon(drawable, ctx, zoomLevel){
 
     ctx.rect(innerX, innerY, innerWidth, innerHeight);
 
-
-    //ctx.rotate(30 * Math.PI/360);
-    //if (drawable.type != 'player'){
     ctx.fill();
-    //}
-    //if (drawable.type != 'player'){
+
     ctx.stroke();
-    //}
 }
 
 
@@ -135,7 +115,6 @@ function makeColorLighter(colorValue){
     const darkerBlue = Math.min(255, Math.round(blueComponent * factor));
 
     // Convert the adjusted color components back to hexadecimal and pad with zeros
-    // Remove Here - Don't touch
     const lighterColorValue = `#${darkerRed.toString(16).padStart(2, '0')}${darkerGreen.toString(16).padStart(2, '0')}${darkerBlue.toString(16).padStart(2, '0')}`;
 
     return lighterColorValue;

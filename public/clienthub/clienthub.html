@@ -34,11 +34,11 @@
 
         
         executeWithOrder(serverData).then(resolvedData => {
-            serverData = resolvedData;  // Use the resolved data here
+            serverData = resolvedData;
         });
         const interval1 = setInterval(() => {
             executeWithOrder(serverData).then(resolvedData => {
-                serverData = resolvedData;  // Use the resolved data here
+                serverData = resolvedData;
             });
         }, 2000);
 
@@ -88,7 +88,6 @@
                         throw new Error(receivedText);
                     }
                 } catch (error) {
-                    // Handle errors (e.g., server not found)
                     alert(error.message);
                 }
             }

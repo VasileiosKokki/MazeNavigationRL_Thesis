@@ -67,17 +67,12 @@
 	<canvas id="gameArea" tabindex="1"></canvas>
 	<script type="module">
 
-		
-		
-		//import { handleKeyAction } from './functions.js'
-
-
 		import {
 			getBaseDivisorAtLevel, handleKeyAction,
 			handleMouseWheel, handleVisibilityChange,
 			handleWebSocketErrorOrClose, onMouseMove,
 			updateCanvasSize
-		} from "../client/functions.js";
+		} from "./functions.js";
 
 		const worker = new Worker("worker.js", { type: "module" });
 		const canvas = document.getElementById('gameArea');
@@ -85,22 +80,13 @@
 		canvas.style.transform = `scale(${scaleFactor})`;
 		const offscreen = canvas.transferControlToOffscreen();
 		worker.postMessage({ type:'canvas', data:offscreen }, [offscreen]);
-		let disconnected = false;
 		updateCanvasSize(scaleFactor, worker);
-	
 
 
-        // Set canvas size on page load
-        //updateCanvasSize();
-
-		canvas.focus();     //poli kako gia to live preview
+		canvas.focus();     // doesn't work well with live preview
 
 		let zoomLevel = 1;
-		let yaxis;
-		let xaxis;
-		let mouseDownInterval;
 		let angle;
-		//let thisclientId;
 		let arrowUpPressed = false;
 		let arrowDownPressed = false;
 		let arrowRightPressed = false;
@@ -111,7 +97,6 @@
 		let lastMouseMoveTime = 0;
 		let score;
 		let highScore;
-		//let intervalID;
 		let drawables = [];
 
 		function Drawable(clientId, name, width, height, topLeftX, topLeftY, color, maxHealth, currentHealth, shape, type, shootingAngle){
@@ -122,8 +107,8 @@
 		this.topLeftX = topLeftX;
 		this.topLeftY = topLeftY;
 		this.color = color; 
-		this.maxHealth = maxHealth; // Health Logic
-		this.currentHealth = currentHealth; // Health Logic
+		this.maxHealth = maxHealth;
+		this.currentHealth = currentHealth;
 		this.shape = shape;
 		this.type = type;
 		this.shootingAngle = shootingAngle;
@@ -163,8 +148,6 @@
 						document.getElementById('connection-layer').style.backgroundColor = 'transparent';
 						document.getElementById('connection-element-1').style.opacity = '0';
 					}
-					//const receivedArrayBuffer = Buffer.from(event.data).buffer;
-					//const receivedUint8Array = new Uint8Array(receivedArrayBuffer);
 					const blob = event.data;
 					const fileReader = new FileReader();
 					fileReader.readAsArrayBuffer(blob);
@@ -182,7 +165,7 @@
 					
   						if (flag === "1") {
 							if (!document.hidden){
-  								// Now you can use pako to decompress the data
+  								// Now we can use pako to decompress the data
 								dataWithoutFlag = pako.inflate(dataWithoutFlag);
 								const decoder = new TextDecoder();
   								const decodedString = decoder.decode(dataWithoutFlag);
@@ -249,9 +232,8 @@
 						const level = message.data.level;
 						const experience = message.data.experience;
 						score = message.data.score;
-						// we dont pass to worker because we use css instead of canvas
+						// we don't pass to worker because we use css instead of canvas
 						const maxExperience = getBaseDivisorAtLevel(level);
-						//console.log(maxExperience);
 						const experiencePercentage = experience / maxExperience;
 						document.getElementById('level-value').textContent = level;
 						document.getElementById('score-value').textContent = score;
@@ -311,9 +293,8 @@
 
 
 			if ((websocket != undefined) && (websocket.readyState == 1)){
-				// 4o epipedo - 4 koumpia
+				// 4th level - 4 buttons
 				if (arrowUpPressed && arrowDownPressed && arrowRightPressed && arrowLeftPressed) {
-				//clearInterval(intervalID); 
 				const message = {type:'userAction',data:'ArrowNotClicked'};
 				websocket.send(JSON.stringify(message));
 				} else {
@@ -359,9 +340,8 @@
 				handleKeyAction(websocket, arrowUpPressed, arrowDownPressed, arrowRightPressed, arrowLeftPressed);
 
 
-				// 0 epipedo - kanena koumpi
+				// 0th level - 0 buttons
 				if (!arrowUpPressed && !arrowDownPressed && !arrowRightPressed && !arrowLeftPressed){
-					//clearInterval(intervalID);
 					const message = {type:'userAction',data:'ArrowNotClicked'};
 					websocket.send(JSON.stringify(message));
 				}

@@ -80,7 +80,6 @@ function handleVisibilityChange(websocket, arrowUpPressed, arrowDownPressed, arr
     if ((websocket != undefined) && (websocket.readyState == 1)){
         if ((arrowUpPressed || arrowDownPressed || arrowRightPressed || arrowLeftPressed) || isShooting) {
 
-            //clearInterval(intervalID);
             arrowUpPressed = false;
             arrowDownPressed = false;
             arrowRightPressed = false;
@@ -99,10 +98,10 @@ function handleVisibilityChange(websocket, arrowUpPressed, arrowDownPressed, arr
 }
 
 
-// koino kai gia to keydown kai gia to keyup event listener
+// common for both keydown and keyup event listener
 function handleKeyAction(websocket, arrowUpPressed, arrowDownPressed, arrowRightPressed, arrowLeftPressed) {
 
-    // 3o epipedo - 3 koumpia
+    // 3rd level - 3 buttons
     if (arrowUpPressed && arrowRightPressed && arrowLeftPressed) {
         const message = {type: 'userAction', data: 'ArrowUp'};
         websocket.send(JSON.stringify(message));
@@ -119,7 +118,7 @@ function handleKeyAction(websocket, arrowUpPressed, arrowDownPressed, arrowRight
 
 
 
-    // 2o epipedo - 2 koumpia
+    // 2nd level - 2 buttons
     if ((arrowUpPressed && arrowDownPressed) || (arrowRightPressed && arrowLeftPressed)) {
         const message = {type:'userAction',data:'ArrowNotClicked'};
         websocket.send(JSON.stringify(message));
@@ -139,7 +138,7 @@ function handleKeyAction(websocket, arrowUpPressed, arrowDownPressed, arrowRight
 
 
 
-    // 1o epipedo - 1 koumpi
+    // 1st level - 1 button
     if (arrowUpPressed) {
         const message = {type: 'userAction', data: 'ArrowUp'};
         websocket.send(JSON.stringify(message));

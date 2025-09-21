@@ -33,8 +33,6 @@ wsRateLimitModule('0.05s', 5);
 
 router.ws('/connected', function(ws, req){
 
-    //clients, drawables, currentHighestScore, currentPlayers, maxPlayers, clientCounter, domain, port, secretKey, gameBoundsDimensions, spatialGridDimensions
-
     const clients = getClients();
     const drawables = getDrawables();
     const currentHighestScore = getCurrentHighestScore();
@@ -123,8 +121,6 @@ router.ws('/connected', function(ws, req){
 
     }
 
-    // setClients(clients)
-    // setDrawables(drawables)
     setCurrentPlayers(currentPlayers)
     setClientCounter(clientCounter)
 

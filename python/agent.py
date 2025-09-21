@@ -1,42 +1,15 @@
 import argparse
-import pickle
-import random
-import re
-import shutil
-import sys
-import json
-import time
-import uuid
-from torchview import draw_graph
-
-from gymnasium.spaces import Dict
-
 import utils
-
-import numpy as np
-
 import gymnasium as gym
-import torch
-from matplotlib import pyplot as plt
-from minigrid.wrappers import RGBImgObsWrapper, ImgObsWrapper
-from stable_baselines3 import A2C, PPO, DQN
+from stable_baselines3 import PPO
 import os
-import tensorflow as tf
 
-from stable_baselines3.common.callbacks import BaseCallback
+
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor, VecNormalize, DummyVecEnv, VecTransposeImage
-from torch import nn, Tensor
+from stable_baselines3.common.vec_env import DummyVecEnv
+from torch import nn
 from stable_baselines3.common.vec_env import VecFrameStack
-
-
-from gymnasium.wrappers import FlattenObservation
-from gymnasium.wrappers import TimeLimit
-
-# from agent import GridWorldAgent
-from tqdm import tqdm
 
 from gymnasium_env.envs import GridWorldEnv
 from python import callbacks
@@ -166,8 +139,6 @@ def train_sb3():
         model_name = f"{model_name}_{args.folder}"
 
     while True:
-        # model.learn(total_timesteps=TIMESTEPS, reset_num_timesteps=False)
-        # model.save(f"{model_dir}/{model_name}_{TIMESTEPS*iters}") # Save a trained model every TIMESTEPS
         save_cb = callbacks.SaveOnTimestepCallback(model, model_dir, save_interval=TIMESTEPS, model_name=model_name)
         mean_goal_cb = callbacks.MeanGoalAchievedCallback()
         max_length_cb = callbacks.MaxEpisodeLengthCallback()
@@ -234,12 +205,9 @@ def try_sb3():
                 agent_location = tuple(obs[:2])
                 utils.collect_agent_positions(agent_location, visited_cells, i)
             while True:
-                # action_masks = get_action_masks(env)
-                # print(action_masks)
                 action, _ = model.predict(
                     observation=obs,
                     deterministic=True,
-                    # action_masks=action_masks
                 )
                 obs, reward, terminated, truncated, info = env.step(action.item())
 
@@ -270,13 +238,11 @@ def try_sb3():
             else:
                 obs = env.reset()
 
-            # print(obs)
             while True:
                 action, _ = model.predict(
                     observation=obs,
                     deterministic=True,
                 )
-                # obs, reward, terminated, truncated = env.step(np.array([action for _ in range(1)]))
                 obs, reward, terminated, truncated = env.step(action)
 
                 # unwrapped_env = env.envs[0].unwrapped
@@ -290,6 +256,7 @@ def try_sb3():
 
 
 # ------------- sb3 -------------
+# Choose between training or testing a model by uncommenting one and commenting out the other one
 if __name__ == '__main__':
     # train_sb3()
     try_sb3()

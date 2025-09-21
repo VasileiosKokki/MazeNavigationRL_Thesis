@@ -15,7 +15,6 @@ async function fetchServerData(serverData){
             throw new Error(receivedText);
         }
     } catch (error) {
-        // Handle errors (e.g., server not found)
         alert(error.message);
     }
 

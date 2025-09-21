@@ -24,9 +24,8 @@ import { fileURLToPath } from 'url';
 import { ArgumentParser } from 'argparse';
 
 
-// const pythonProcess = spawn('python', ['../python/main.py']);
 const pythonExecutable = path.join(process.env.HOME, 'miniforge3/envs/tankio/bin/python');
-const mainScript = 'python/main.py';
+const mainScript = 'python/interface.py';
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const pythonProcess = spawn(pythonExecutable, [mainScript], {
@@ -207,36 +206,6 @@ for (let i = 0; i < cellNum; i++) {
 
 unwalkableCells = unwalkableCells.map(([x, y]) => [x, y, x, y]);
 
-// const unwalkableCells = generateRandomWalls(0);
-// const unwalkableCells = [
-// 	[6,5], [5,2], [5,0], [6,2], [4, 0], [4, 9], [5, 1], [2, 2], [0, 14],
-// 	[11, 14], [15, 5], [1, 15], [18, 10], [4, 2], [5, 3], [8, 2], [14, 15],
-// 	[17, 14], [11, 7], [2, 4], [13, 1], [15, 7], [6, 4], [5, 5], [5, 14],
-// 	[9, 12], [15, 0], [6, 6], [7, 5], [17, 9], [1, 3], [13, 5], [1, 12],
-// 	[15, 11], [7, 7], [18, 16], [14, 3], [17, 2], [14, 12], [11, 4], [9, 16],
-// 	[13, 7], [15, 4], [6, 1], [18, 0], [13, 16], [15, 13], [2, 13], [18, 18],
-// 	[12, 17], [10, 1], [7, 2], [13, 18], [11, 18], [16, 14], [7, 11], [18, 11],
-// 	[3, 16], [1, 0], [1, 9], [11, 11], [16, 16], [6, 17], [18, 8], [4, 17],
-// 	[8, 8], [13, 4], [8, 17], [11, 13], [2, 10], [0, 13], [3, 2], [3, 11],
-// 	[4, 10], [17, 13], [10, 7], [1, 4], [1, 13], [6, 3], [3, 4], [10, 0],
-// 	[8, 12], [15, 8], [18, 13], [10, 2], [10, 11], [2, 16], [15, 10], [18, 15],
-// 	[4, 16], [17, 10], [11, 3], [10, 13], [9, 15], [0, 12], [2, 9], [2, 18],
-// 	[6, 0], [15, 12], [7, 8]
-// ].map(([x, y]) => [x, y, x, y]);
-
-// const unwalkableCells = [
-// 	[0, 2], [9, 2],
-// 	[1, 2], [1, 3], [1, 5], [1, 6],
-// 	[2, 1], [2, 3], [2, 6], [2, 8],
-// 	[3, 1], [3, 8],
-// 	[4, 3], [4, 5], [4, 6],
-// 	[5, 1], [5, 3], [5, 6], [5, 8],
-// 	[6, 2], [6, 3], [6, 5], [6, 7],
-// 	[7, 4],
-// 	[8, 2], [8, 3], [8, 6], [8, 7]
-// ].map(([x, y]) => [x, y, x, y]);
-
-
 
 // let unwalkableCells;
 //
@@ -380,7 +349,7 @@ function GameLogic(){
 				drawable.topLeftX-=drawable.speed;
 				break;
 			case 'up+right':
-				drawable.topLeftY-=drawable.speed/1.414;  // diairoume me to 1.414 giati pame diagonia
+				drawable.topLeftY-=drawable.speed/1.414;
 				drawable.topLeftX+=drawable.speed/1.414;
 				break;
 			case 'up+left':
@@ -538,8 +507,7 @@ function MessageLogic(){
 	}
 	
 	
-	
-	//const message = JSON.stringify({type:'model',data:sortedDrawables});
+
 	const message = JSON.stringify({type:'model',data:arrayOfArrays});
 	const compressedData = zlib.deflateSync(message, { level: -1 });	  	  // reduce message size #2
 	//console.log(`Sending message of size ${compressedData.length} bytes`);
@@ -570,7 +538,6 @@ let interval = setInterval(function(){
 	GameLogic();
 	GameLogic();
 	GameLogic();
-	// 8
 	MessageLogic();
 	sendDrawablesToPython(drawables, pythonProcess)
 },40);

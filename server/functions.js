@@ -501,7 +501,6 @@ async function sendServerInfo(thisServer, secretKey){
             body: JSON.stringify(thisServer),
         });
     } catch (error) {
-        // Handle errors (e.g., server not found or offline)
         // console.log(error.message);
     }
 }
@@ -563,8 +562,6 @@ function checkCollision(drawable1, drawable2) {
 
 
 function knockbackWithDmg(drawable1, drawable2){
-
-
     // knockback amount section
 
     let knockbackAmount;
@@ -587,8 +584,6 @@ function knockbackWithDmg(drawable1, drawable2){
     if (knockbackAmount < 1){
         knockbackAmount = 1;
     }
-
-    //knockbackAmount *= 5;
 
     // damage section
     drawable1.currentHealth -= drawable2.bodyDamage;  // damage based on knockback and damage

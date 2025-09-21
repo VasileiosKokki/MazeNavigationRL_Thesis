@@ -15,10 +15,6 @@ import os
 import utils
 from gymnasium.utils import seeding
 
-# try:
-#     pydevd_pycharm.settrace('localhost', port=5678, stderrToServer=True, suspend=False)
-# except ConnectionRefusedError:
-#     pass
 
 cell = None
 path_grid_dimensions = None

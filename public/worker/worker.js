@@ -85,7 +85,7 @@ function Presentation(drawables){
 
 
     drawables.filter(drawable => {
-        if (drawable.clientId == properId){  // gia ton paikth pou elegxoume
+        if (drawable.clientId == properId){  // check if it matches the player we control
             ({targetCameraX, targetCameraY} = recenterCamera(drawable, zoomLevel, canvas));
             ({cameraX, cameraY, cameraReached, cameraSpeed} = updateCamera(targetCameraX, targetCameraY, cameraX, cameraY, cameraReached, cameraSpeed));
         }
@@ -191,7 +191,6 @@ function Presentation(drawables){
             ctx.translate(centerX, centerY);
             ctx.rotate(drawable.shootingAngle);
             ctx.translate(-centerX, -centerY);
-            //console.log(drawable.shootingAngle);
             ctx.beginPath();
             drawCannon(drawable, ctx, zoomLevel);
 

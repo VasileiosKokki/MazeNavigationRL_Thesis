@@ -1,13 +1,9 @@
-import copy
-import json
 import sys
 from enum import Enum
 import gymnasium as gym
 from gymnasium import spaces
 import pygame
 import numpy as np
-from pathfinding.core.grid import Grid
-from pathfinding.finder.a_star import AStarFinder
 
 def debug_print(*args):
     """Prints debug information to stderr."""
@@ -29,22 +25,7 @@ class RealWorldEnv(gym.Env):
         self.window_size = 512  # The size of the PyGame window
         self._agent_location = None
         self._target_location = None
-        matrix = [[1 for _ in range(size)] for _ in range(size)]
-        self.grid = Grid(matrix=matrix)
 
-        # Observations are dictionaries with the agent's and the target's location.
-        # Each location is encoded as an element of {0, ..., `size`}^2,
-        # i.e. MultiDiscrete([size, size]).
-
-        # try:
-        #     with open("obstacles.json", "r") as file:
-        #         obstacles = json.load(file)
-        #         obstacles = list(map(tuple, obstacles))
-        # except FileNotFoundError:
-        #     print("The file 'obstacles.json' does not exist.")
-        # except json.JSONDecodeError:
-        #     print("Error: The file 'obstacles.json' contains invalid JSON.")
-        # self.obstacles = obstacles
         border_obstacle_count = 2 * self.size + 2 * (self.size - 2)
 
         self.obstacles = set()
@@ -74,12 +55,7 @@ class RealWorldEnv(gym.Env):
             Actions.up.value: np.array([0, -1]),
             Actions.left.value: np.array([-1, 0]),
             Actions.down.value: np.array([0, 1]),
-            # Actions.still.value: np.array([0, 0]),
         }
-
-        # self.obstacles = self._generate_obstacles()
-
-
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -93,14 +69,6 @@ class RealWorldEnv(gym.Env):
         """
         self.window = None
         self.clock = None
-
-    # def _generate_obstacles(self):
-    #     """Randomly generate obstacle locations on the grid."""
-    #     obstacles = set()
-    #     while len(obstacles) < self.num_obstacles:
-    #         obstacle = tuple(self.np_random.integers(0, self.size - 1, size=2))
-    #         obstacles.add(obstacle)
-    #     return obstacles
 
     def _get_obs(self):
         result = np.concatenate([np.array(self._agent_location), np.array(self._target_location), np.array(sorted(self.obstacles)).flatten(),])
@@ -124,49 +92,9 @@ class RealWorldEnv(gym.Env):
             self._target_location = np.array([target['cellX'], target['cellY']], dtype=int)
 
 
-    # def action_masks(self) -> np.ndarray:
-    #     # Initialize action mask (0: invalid, 1: valid) for 5 actions
-    #     action_mask = [1] * 4
-    #
-    #     # Get agent's current position
-    #     x, y = self._agent_location
-    #
-    #     # Check boundaries and obstacles for each action
-    #     if y == 0 or (x, y - 1) in self.obstacles:  # Up
-    #         action_mask[Actions.up.value] = 0
-    #     if y == self.size - 1 or (x, y + 1) in self.obstacles:  # Down
-    #         action_mask[Actions.down.value] = 0
-    #     if x == 0 or (x - 1, y) in self.obstacles:  # Left
-    #         action_mask[Actions.left.value] = 0
-    #     if x == self.size - 1 or (x + 1, y) in self.obstacles:  # Right
-    #         action_mask[Actions.right.value] = 0
-    #
-    #     # print(action_mask)
-    #
-    #     # The Still action is always valid
-    #     # action_mask[Actions.still.value] = True
-    #
-    #     # Return the info dictionary with the action mask
-    #     action_mask = np.array(action_mask)
-    #     return action_mask
-
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
-
-        # self._agent_location = np.array([agent['cellX'], agent['cellY']], dtype=int)
-        # self._target_location = np.array([target['cellX'], target['cellY']], dtype=int)
-
-        # self.obstacles = self._generate_obstacles()
-        # for x, y in self.obstacles:
-        #     self.grid.node(x, y).walkable = False
-
-        # Choose the agent's location uniformly at random
-
-        # We will sample the target's location randomly until it does not
-        # coincide with the agent's location
-        #print("Agent location:", self._agent_location)
-        #print("Target location:", self._target_location)
 
         observation = self._get_obs()
         info = self._get_info()
@@ -178,59 +106,16 @@ class RealWorldEnv(gym.Env):
 
     def step(self, action=None):
 
-
-
-        #print("Agent location:", self._agent_location)
-        #print("Target location:", self._target_location)
         info = self._get_info()
 
-
-
-
-        # grid_copy = copy.deepcopy(self.grid)
-        # start = grid_copy.node(self._agent_location[0], self._agent_location[1])
-        # end = grid_copy.node(self._target_location[0], self._target_location[1])
-        # finder = AStarFinder()
-        # path, runs = finder.find_path(start, end, grid_copy)
-        # path_coordinates = [(node.x, node.y) for node in path]
-        #debug_print('operations:', runs, 'path:', path_coordinates)
-
-
-        # distanceBefore = np.linalg.norm(
-        #     self._agent_location - self._target_location, ord=1
-        # )
         terminated = np.array_equal(self._agent_location, self._target_location)
-        # if not terminated:
-        #     direction = self._action_to_direction[action]
-        #     new_agent_location = np.clip(
-        #         self._agent_location + direction, 0, self.size - 1
-        #     )
-        #     # if tuple(new_agent_location) not in self.obstacles:
-        #     #     self._agent_location = new_agent_location
-        #     self._agent_location = new_agent_location
-
-        # distanceAfter = np.linalg.norm(
-        #     new_agent_location - self._target_location, ord=1
-        # )
-
-        # terminated = np.array_equal(self._agent_location, self._target_location)
 
 
-
-
-        #reward = (distanceBefore - distanceAfter + 1) / 2
         if terminated:
             reward = 100
-            debug_print(reward)
+            # debug_print(reward)
         else:
             reward = 0
-            # if tuple(new_agent_location) in self.obstacles: || distanceBefore == distanceAfter:
-            #     reward = -1
-            # if len(path_coordinates) > 1 and tuple(self._agent_location) == path_coordinates[1]:
-            #     reward = 1
-            #reward = -1
-            # if tuple(new_agent_location) in self.obstacles:
-            #     reward = -10
 
 
         observation = self._get_obs()
@@ -256,9 +141,6 @@ class RealWorldEnv(gym.Env):
 
         canvas = pygame.Surface((self.window_size, self.window_size))
         canvas.fill((255, 255, 255))
-        pix_square_size = (
-                self.window_size / self.size
-        )  # The size of a single grid square in pixels
 
         # Draw obstacles
         pix_square_size = self.window_size / self.size
