@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+title: >-
+  MazeNavigationRL_Thesis
+message: >-
+  If you use this repository for your research, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Vasileios
+    family-names: Kokkinogenis
+date-released: 2025-09-25
+identifiers:
+  - type: url
+    value: 'https://github.com/VasileiosKokki/MazeNavigationRL_Thesis'
+repository-code: 'https://github.com/VasileiosKokki/MazeNavigationRL_Thesis'
+url: 'https://github.com/VasileiosKokki/MazeNavigationRL_Thesis'
+abstract: >-
+  This repository contains code and experiments for evaluating PPO agents in maze-like
+  environments with increasing complexity. It was developed as part of a thesis project
+  investigating reinforcement learning navigation strategies and agent performance
+  across various structured and stochastic environments. The repository also includes
+  a JavaScript-based game designed to allow integration of the trained agents into a
+  real-time multiplayer environment, enabling online players to interact with the
+  RL agents in a live game setting.
+keywords:
+  - reinforcement learning
+  - maze navigation
+  - PPO
+  - gridworld
+  - javascript
+  - multiplayer
+  - game integration
+license: MIT
