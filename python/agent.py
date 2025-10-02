@@ -12,7 +12,7 @@ from torch import nn
 from stable_baselines3.common.vec_env import VecFrameStack
 
 from gymnasium_env.envs import GridWorldEnv
-from python import callbacks
+import callbacks
 
 class CustomCNNFeatureExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space, features_dim=512):
