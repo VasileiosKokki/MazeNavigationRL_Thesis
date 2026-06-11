@@ -4,6 +4,13 @@ This repository contains the source code for a **thesis project** on training an
 
 It leverages the **[Gymnasium](https://gymnasium.farama.org/)** library to implement a standard maze navigation environment and explores the **generalization capabilities of RL agents** in increasingly complex scenarios.  
 
+## 📖 Thesis
+
+The complete thesis can be accessed here:
+
+**Maze Navigation using Reinforcement Learning**  
+https://estia.hua.gr/entities/publication/9664ba80-bbcb-473f-838e-2f2d910ccb31
+
 ---
 
 ## 📌 Project Overview  
