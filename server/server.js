@@ -24,12 +24,42 @@ import { fileURLToPath } from 'url';
 import { ArgumentParser } from 'argparse';
 
 
-const pythonExecutable = path.join(process.env.HOME, 'miniforge3/envs/tankio/bin/python');
-const mainScript = 'python/interface.py';
-const dirname = path.dirname(fileURLToPath(import.meta.url));
+const dirname = path.dirname(
+    fileURLToPath(import.meta.url)
+);
 
-const pythonProcess = spawn(pythonExecutable, [mainScript], {
-	cwd: path.resolve(dirname, '..') // set working dir to project root
+// Add PYTHON_EXECUTABLE=C:\Users\Cinic\miniconda3\envs\myenv\python.exe in environment variables
+// we found this path using python -c "import sys; print(sys.executable)" in console
+
+const pythonExecutable =
+    process.env.PYTHON_EXECUTABLE ||
+    (process.platform === 'win32'
+        ? 'python'
+        : 'python3');
+
+const mainScript = path.join(
+    dirname,
+    '..',
+    'python',
+    'interface.py'
+);
+
+console.log('Python executable:', pythonExecutable);
+console.log('Python script:', mainScript);
+
+const pythonProcess = spawn(
+    pythonExecutable,
+    [mainScript],
+    {
+        cwd: path.resolve(dirname, '..')
+    }
+);
+
+pythonProcess.on('error', (error) => {
+    console.error(
+        `Failed to start Python executable: ${pythonExecutable}`
+    );
+    console.error(error);
 });
 
 const limiter = rateLimit({

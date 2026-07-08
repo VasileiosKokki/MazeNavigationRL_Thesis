@@ -36,7 +36,7 @@
 			transition: background-color 0.5s ease
 		}
 	</style>
-	<link rel="stylesheet" href="./styles.css">
+	<link rel="stylesheet" href="/client/styles.css">
 </head>
 <body>
 	<div id="connection-layer" class="ui-layer">
@@ -72,9 +72,9 @@
 			handleMouseWheel, handleVisibilityChange,
 			handleWebSocketErrorOrClose, onMouseMove,
 			updateCanvasSize
-		} from "./functions.js";
+		} from "/client/functions.js";
 
-		const worker = new Worker("worker.js", { type: "module" });
+		const worker = new Worker("/worker/worker.js", { type: "module" });
 		const canvas = document.getElementById('gameArea');
 		const scaleFactor = 1 / window.devicePixelRatio;
 		canvas.style.transform = `scale(${scaleFactor})`;
