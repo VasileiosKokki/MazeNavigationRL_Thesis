@@ -33,18 +33,11 @@ The work was developed as my Bachelor thesis, **“Evaluation of Reinforcement L
 
 ### Demo Video
 
-<p align="center">
-  <a href="assets/MazeNavigationDemo.mp4">
-    <img src="assets/demo-preview.png" alt="Demo of the PPO agent connected to the JavaScript game and Gymnasium environment" width="92%" />
-  </a>
-</p>
+https://github.com/user-attachments/assets/6fc789c4-2d30-4795-900b-aa729d20049f
 
 <p align="center">
-  <strong>▶ Click the preview to open the demo video</strong><br/>
   <em>The recording shows the real-time JavaScript game and the synchronized Gymnasium-side representation used by the RL interface.</em>
 </p>
-
-**Direct link:** [▶ Watch `MazeNavigationDemo.mp4`](assets/MazeNavigationDemo.mp4)
 
 ---
 
